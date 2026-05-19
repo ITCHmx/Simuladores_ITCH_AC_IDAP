@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Juego Mapache E/S - Procesamiento en Paralelo</title>
+    <style>
+        body { margin: 0; padding: 0; font-family: Arial, sans-serif; background: #000; overflow: hidden; }
+        #escena { position: relative; width: 100%; height: 100vh; }
+        
+        #fondo { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; z-index: -1; transition: opacity 0.2s ease; }
+        
+        /* Contenedor para agrupar personaje y texto */
+        #contenedor-personaje {
+            position: absolute;
+            bottom: 20px; 
+            display: flex;
+            flex-direction: column-reverse; /* Mensaje arriba, personaje abajo */
+            align-items: center; 
+            z-index: 1;
+            transition: all 0.5s ease-in-out; 
+        }
+
+        #personaje { 
+            height: 500px; 
+            width: auto; 
+            background-color: transparent !important;
+            margin-top: -30px; 
+            margin-bottom: 0px;
+            object-fit: contain;
+            object-position: bottom center;
+        }
+
+        #mensaje {
+            background: rgba(255, 255, 255, 0.85); 
+            padding: 20px 30px;
+            border-radius: 15px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #000;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+            max-width: 650px;
+            text-align: center;
+            position: relative;
+            z-index: 2; 
+        }
+
+        #mensaje h2 { font-size: 22px; margin: 0 0 10px 0; color: #007BFF; text-transform: uppercase; }
+
+        /* Triangulito del bocadillo */
+        #mensaje::after {
+            content: '';
+            position: absolute;
+            bottom: -15px; 
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 15px 15px 0;
+            border-style: solid;
+            border-color: rgba(255, 255, 255, 0.85) transparent transparent; 
+        }
+
+        /* Botones en la parte superior derecha */
+        .btn-nav { 
+            position: absolute; 
+            top: 20px; 
+            padding: 12px 25px; 
+            font-size: 16px; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            color: white; 
+            z-index: 10; 
+            transition: all 0.3s ease; 
+            font-weight: bold;
+        }
+        
+        #btn-siguiente { right: 20px; background: #28a745; }
+        #btn-anterior { right: 200px; background: #6c757d; } 
+        
+        .btn-nav:hover { transform: scale(1.05); opacity: 0.9; }
+        .btn-nav:disabled { background: #ccc; cursor: not-allowed; }
+        .oculto { display: none !important; }
+
+        /* Elementos de Simulación de Rendimiento - Ajustado a la izquierda */
+        #simulacion-overlay {
+            position: absolute;
+            top: 90px;
+            right: 150px; 
+            width: 55%; 
+            max-width: 750px;
+            background: rgba(15, 15, 25, 0.9);
+            border: 2px solid #007BFF;
+            border-radius: 15px;
+            padding: 20px;
+            display: flex;
+            gap: 25px;
+            color: #fff;
+            z-index: 5;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            box-sizing: border-box;
+        }
+
+        .panel-progreso { flex: 1.2; display: flex; flex-direction: column; justify-content: center; gap: 15px; }
+        .grupo-barra { display: flex; flex-direction: column; gap: 5px; }
+        .etiqueta-barra { font-weight: bold; font-size: 14px; color: #ddd; }
+        .barra-contenedor { background: #222; border: 1px solid #444; border-radius: 10px; padding: 2px; overflow: hidden; }
+        .barra { height: 22px; border-radius: 8px; width: 0%; display: flex; align-items: center; justify-content: flex-end; padding-right: 10px; font-size: 12px; font-weight: bold; box-sizing: border-box; }
+        .barra-rapida { background: linear-gradient(90deg, #28a745, #5cd65c); color: #fff; }
+        .barra-lenta { background: linear-gradient(90deg, #dc3545, #ff6b6b); color: #fff; }
+
+        /* Panel de Consola / Ejecución de Datos */
+        .panel-consola { 
+            flex: 1; 
+            background: #05050a; 
+            border: 1px solid #333;
+            border-radius: 12px; 
+            padding: 12px; 
+            font-family: 'Courier New', Courier, monospace; 
+            font-size: 12px; 
+            color: #00ff66; 
+            height: 140px; 
+            overflow-y: hidden; 
+            box-shadow: inset 0 0 15px rgba(0,0,0,1);
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            box-sizing: border-box;
+        }
+        .linea-log { margin: 2px 0; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    </style>
+</head>
+<body onload="inicializarEscena()">
+    <div id="escena">
+        <img id="fondo" src="" alt="Fondo">
+        
+        <div id="simulacion-overlay" class="oculto">
+            <div class="panel-progreso">
+                <div class="grupo-barra">
+                    <div class="etiqueta-barra">🚀 Red de 3 Computadoras (Procesamiento Paralelo)</div>
+                    <div class="barra-contenedor">
+                        <div id="barra-3pc" class="barra barra-rapida">0%</div>
+                    </div>
+                </div>
+                <div class="grupo-barra">
+                    <div class="etiqueta-barra">🐌 1 Computadora Sola (Procesamiento Secuencial)</div>
+                    <div class="barra-contenedor">
+                        <div id="barra-1pc" class="barra barra-lenta">0%</div>
+                    </div>
+                </div>
+            </div>
+            <div id="consola-logs" class="panel-consola"></div>
+        </div>
+
+        <div id="contenedor-personaje">
+            <div id="mensaje">Cargando...</div>
+            <img id="personaje" src="" alt="Locutor">
+        </div>
+    </div>
+
+    <button id="btn-siguiente" class="btn-nav">Siguiente</button>
+    <button id="btn-anterior" class="btn-nav oculto">Anterior</button>
+
+    <script>
+        const escenas = [
+            { 
+                fondo: "Dinosaurio/imagenes/Laboratorio_MonitorApagado.jpg", 
+                pers: "Dinosaurio/imagenes/Mapache_Saluda.png", 
+                msg: "¡Hola Mapaches! “La tarea que realizaremos será sumar todos los números del uno al novecientos mil. Es un cálculo grande, ideal para mostrar la diferencia entre hacerlo en una sola computadora y hacerlo en paralelo con tres computadoras conectadas en red.”", 
+                titulo: "Paso 1: Definición de la tarea",
+                simular: false 
+            },
+            { 
+                fondo: "Dinosaurio/imagenes/2B.png", 
+                pers: "Dinosaurio/imagenes/Mapache_Explica_ConDedo.png", 
+                msg: "“Primero cargamos la tarea completa en una sola computadora. El simulador muestra cómo el sistema recibe la instrucción, pero aún no la ejecutaremos. La tarea queda lista, esperando a ser procesada.”", 
+                titulo: "Paso 2: Carga de la tarea en una computadora",
+                simular: false 
+            },
+            { 
+                fondo: "Dinosaurio/imagenes/3B.png", 
+                pers: "Dinosaurio/imagenes/Mapache_ManosAbiertas.png", 
+                msg: "*“Ahora cargamos la misma tarea en tres computadoras conectadas en red. Dividimos el cálculo en tres bloques:<br><br><b>PC1:</b> suma del uno al trescientos mil.<br><b>PC2:</b> suma del trescientos uno mil al seiscientos mil.<br><b>PC3:</b> suma del seiscientos uno mil al novecientos mil.<br><br>Cada computadora recibe su parte de la tarea.”*", 
+                titulo: "Paso 3: Carga de la tarea en tres computadoras",
+                simular: false 
+            },
+            { 
+                fondo: "Dinosaurio/imagenes/1B.png", 
+                pers: "Dinosaurio/imagenes/Mapache_Explica_ConDedo.png", 
+                msg: "“El simulador inicia la ejecución en ambos escenarios: la computadora sola comienza a procesar su tarea completa, mientras que las tres computadoras trabajan en paralelo con sus bloques asignados. Observamos cómo los resultados parciales de las tres PCs se combinan rápidamente en un archivo compartido.”", 
+                titulo: "Paso 4: Ejecución simultánea",
+                simular: true 
+            },
+            { 
+                fondo: "Dinosaurio/imagenes/3B.png", 
+                pers: "Dinosaurio/imagenes/Mapache_ManosAbiertas.png", 
+                msg: "“Como se logra ver, las tres computadoras terminaron primero.”", 
+                titulo: "Paso 5: Comparison de resultados",
+                simular: true 
+            },
+            { 
+                fondo: "Dinosaurio/imagenes/2B.png", 
+                pers: "Dinosaurio/imagenes/Mapache_Explica_ConDedo.png", 
+                msg: "“...mientras que la computadora sola continúa procesando y parece que tardará un poco más en llegar al resultado final.”", 
+                titulo: "Paso 5: Comparación de resultados",
+                simular: true 
+            },
+            { 
+                fondo: "Dinosaurio/imagenes/3B.png", 
+                pers: "Dinosaurio/imagenes/Mapache_Saluda.png", 
+                msg: "“Esto demuestra la ventaja del procesamiento paralelo distribuido: dividir el trabajo entre varios equipos reduce el tiempo total de ejecución.”", 
+                titulo: "Paso 5: Comparación de resultados",
+                simular: true /* Cambiado a true para que el simulador se mantenga visible en esta escena */
+            },
+            { 
+                fondo: "Dinosaurio/imagenes/5B.png", 
+                pers: "Dinosaurio/imagenes/Mapache_ManosAbiertas.png", 
+                msg: "*“Este mismo principio se aplica en muchos ámbitos tecnológicos que usamos día a día. Por ejemplo, en el renderizado de películas o animaciones digitales, los estudios dividen cada escena en fragmentos y los procesan en paralelo en varias computadoras, reduciendo semanas de trabajo a solo días.”*", 
+                titulo: "Paso 6: Ejemplos cercanos y fáciles de entender",
+                simular: false 
+            },
+            { 
+                fondo: "Dinosaurio/imagenes/6B.png", 
+                pers: "Dinosaurio/imagenes/Mapache_Explica_ConDedo.png", 
+                msg: "*“También ocurre en las plataformas de redes sociales, donde millones de publicaciones se procesan en paralelo en servidores distribuidos para que los usuarios reciban contenido al instante.”*", 
+                titulo: "Paso 6: Ejemplos cercanos y fáciles de entender",
+                simular: false 
+            },
+            { 
+                fondo: "Dinosaurio/imagenes/7B.png", 
+                pers: "Dinosaurio/imagenes/Mapache_ManosAbiertas.png", 
+                msg: "*“Incluso en el análisis de grandes volúmenes de datos (Big Data), la información se reparte entre distintos servidores que trabajan simultáneamente, logrando resultados que serían imposibles para una sola máquina.”*", 
+                titulo: "Paso 6: Ejemplos cercanos y fáciles de entender",
+                simular: false 
+            },
+            { 
+                fondo: "Dinosaurio/imagenes/4B.png", 
+                pers: "Dinosaurio/imagenes/Mapache_Saluda.png", 
+                msg: "*“En todos los casos, el objetivo es el mismo: aprovechar la colaboración para obtener resultados más rápidos y eficientes.”*", 
+                titulo: "Paso 6: Ejemplos cercanos y fáciles de entender",
+                simular: false 
+            }
+        ];
+
+        let indice = 0;
+        let simInterval = null;
+        let logInterval = null;
+        let progresoRapido = 0;
+        let progresoLento = 0;
+
+        const btnSig = document.getElementById("btn-siguiente");
+        const btnAnt = document.getElementById("btn-anterior");
+        const fondo = document.getElementById("fondo");
+        const personaje = document.getElementById("personaje");
+        const mensaje = document.getElementById("mensaje");
+        const contenedor = document.getElementById("contenedor-personaje");
+        const simulacionOverlay = document.getElementById("simulacion-overlay");
+        const barra3PC = document.getElementById("barra-3pc");
+        const barra1PC = document.getElementById("barra-1pc");
+        const consolaLogs = document.getElementById("consola-logs");
+
+        function ajustarPosicionContenedor(numEscena) {
+            contenedor.style.left = "auto";
+            contenedor.style.right = "auto";
+            contenedor.style.transform = "none";
+
+            // Escena 1 (índice 0): Centro
+            if (numEscena === 0) {
+                contenedor.style.left = "50%";
+                contenedor.style.transform = "translateX(-50%)";
+            } 
+            // A partir de Escena 2 (índice 1) hasta que termine el simulador (ahora extendido hasta el índice 6)
+            else if (numEscena >= 1 && numEscena <= 6) {
+                contenedor.style.left = "40px";
+            }
+            // Después del simulador
+            else {
+                const posicionSecundaria = numEscena % 2;
+                if (posicionSecundaria === 0) {
+                     contenedor.style.right = "80px";
+                } else {
+                     contenedor.style.left = "50%";
+                     contenedor.style.transform = "translateX(-50%)";
+                }
+            }
+        }
+
+        function actualizarUI() {
+            if (indice > 0) btnAnt.classList.remove("oculto");
+            else btnAnt.classList.add("oculto");
+            btnSig.innerText = (indice === escenas.length - 1) ? "Terminar" : "Siguiente";
+        }
+
+        function limpiarSimulacion() {
+            clearInterval(simInterval);
+            clearInterval(logInterval);
+            simInterval = null;
+            logInterval = null;
+            progresoRapido = 0;
+            progresoLento = 0;
+            barra3PC.style.width = "0%";
+            barra3PC.innerText = "0%";
+            barra1PC.style.width = "0%";
+            barra1PC.innerText = "0%";
+            consolaLogs.innerHTML = "";
+        }
+
+        function ejecutarSimulacion() {
+            if (simInterval !== null) return; 
+
+            simInterval = setInterval(() => {
+                if (progresoRapido < 100) {
+                    progresoRapido += Math.floor(Math.random() * 5) + 5;
+                    if (progresoRapido > 100) progresoRapido = 100;
+                    barra3PC.style.width = progresoRapido + "%";
+                    barra3PC.innerText = progresoRapido + "%";
+                }
+
+                if (progresoLento < 35) {
+                    progresoLento += (Math.random() * 1.2);
+                } else if (progresoLento < 100) {
+                    progresoLento += 0.05;
+                }
+
+                let displayLento = Math.min(Math.floor(progresoLento), 100);
+                barra1PC.style.width = displayLento + "%";
+                barra1PC.innerText = displayLento + "%";
+            }, 150);
+
+            const operaciones = [
+                "PC1: Procesando bloque [1 - 75000]...",
+                "PC2: Procesando bloque [300001 - 375000]...",
+                "PC3: Procesando bloque [600001 - 675000]...",
+                "PC1: Suma parcial acumulada = 2,812,537,500",
+                "PC2: Suma parcial acumulada = 25,312,537,500",
+                "PC3: Suma parcial acumulada = 47,812,537,500",
+                "Sola: Procesando bucle secuencial iteración 42800...",
+                "PC1: Bloque 1 Completado ✔",
+                "PC2: Procesando bloque [375001 - 450000]...",
+                "PC3: Bloque 1 Completado ✔",
+                "Sola: Memoria RAM al 78% (Hilo único)...",
+                "PC3: Combinando resultados en archivo central...",
+                "PC1 & PC2 & PC3: ¡Sincronización de registros exitosa!",
+                "Sola: Procesando bucle secuencial iteración 112400..."
+            ];
+
+            logInterval = setInterval(() => {
+                const lineaAleatoria = operaciones[Math.floor(Math.random() * operaciones.length)];
+                const timestamp = new Date().toLocaleTimeString().split(' ')[0];
+                
+                const div = document.createElement("div");
+                div.className = "linea-log";
+                div.innerHTML = `<span style="color: #007BFF;">[${timestamp}]</span> ${lineaAleatoria}`;
+                consolaLogs.appendChild(div);
+
+                if (consolaLogs.childNodes.length > 6) {
+                    consolaLogs.removeChild(consolaLogs.firstChild);
+                }
+            }, 400);
+        }
+
+        function cambiarEscena(nuevoIndice) {
+            indice = nuevoIndice;
+            const escena = escenas[indice];
+            fondo.style.opacity = 0;
+            
+            if (escena.simular) {
+                simulacionOverlay.classList.remove("oculto");
+                ejecutarSimulacion(); 
+            } else {
+                simulacionOverlay.classList.add("oculto");
+                if (indice < 3 || indice > 6) {
+                    limpiarSimulacion();
+                }
+            }
+
+            setTimeout(() => {
+                fondo.src = escena.fondo;
+                personaje.src = escena.pers;
+                
+                let tituloHTML = escena.titulo ? `<h2>${escena.titulo}</h2>` : "";
+                mensaje.innerHTML = tituloHTML + escena.msg;
+                
+                ajustarPosicionContenedor(indice);
+                actualizarUI();
+                fondo.style.opacity = 1;
+            }, 150);
+        }
+
+        function inicializarEscena() {
+            cambiarEscena(0);
+        }
+
+        btnSig.addEventListener("click", () => {
+            if (indice < escenas.length - 1) cambiarEscena(indice + 1);
+            else alert("¡Felicidades, has aprendido cómo trabaja el procesamiento en paralelo con los Mapaches!");
+        });
+
+        btnAnt.addEventListener("click", () => {
+            if (indice > 0) {
+                if (indice === 7 || indice === 3) {
+                     limpiarSimulacion();
+                }
+                cambiarEscena(indice - 1);
+            }
+        });
+    </script>
+</body>
+</html>
