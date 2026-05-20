@@ -3,10 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Simulador_del_CPU</title>
-    <link rel="icon"
-        href="Logo.png"
-        type="image/x-icon">
+    <title>CPU Architecture Sim v2.8 - Fixed Default</title>
     <style>
         :root {
             --bg-main: #d1d5db;
@@ -41,7 +38,6 @@
             box-shadow: 4px 0 10px rgba(0, 0, 0, 0.1);
             z-index: 10;
             backdrop-filter: blur(5px);
-            /* Suaviza el fondo tras el panel */
         }
 
         .code-editor {
@@ -219,9 +215,9 @@
             <div id="step-execute" class="step-pill">EXECUTE</div>
         </div>
 
-        <textarea id="editor" class="code-editor">MOV AX, 10
-MOV BX, 20
-ADD AX, BX
+        <textarea id="editor" class="code-editor">MOV AX, 12
+SUB AX, 9
+ADD AX, 15
 MOV CX, AX</textarea>
 
         <div class="btn-group">
@@ -324,17 +320,23 @@ MOV CX, AX</textarea>
         }
 
         async function executeStep() {
-            const lines = document.getElementById('editor').value.split('\n').filter(l => l.trim() !== "");
+            // Corrección: Separar comentarios usando el caracter ';' para evitar fallos de lectura
+            const lines = document.getElementById('editor').value.split('\n')
+                .map(line => line.split(';')[0].trim()) // Ignora todo lo que esté después de un ';'
+                .filter(l => l !== "");
+
             if (cpu.PC >= lines.length) { isRunning = false; return; }
 
             document.querySelectorAll('.step-pill').forEach(s => s.classList.remove('active'));
             document.querySelectorAll('.wire').forEach(w => w.classList.remove('wire-active'));
 
+            // FETCH
             document.getElementById('step-fetch').classList.add('active');
             cpu.IR = lines[cpu.PC].trim();
             updateUI('IR');
             await new Promise(r => setTimeout(r, 400));
 
+            // DECODE
             document.getElementById('step-decode').classList.add('active');
             const parts = cpu.IR.replace(',', '').split(/\s+/);
             const op = parts[0].toUpperCase();
@@ -342,6 +344,7 @@ MOV CX, AX</textarea>
             const src = parts[2]?.toUpperCase();
             await new Promise(r => setTimeout(r, 400));
 
+            // EXECUTE
             document.getElementById('step-execute').classList.add('active');
             const getVal = (v) => cpu.hasOwnProperty(v) ? cpu[v] : parseInt(v) || 0;
 
@@ -372,7 +375,11 @@ MOV CX, AX</textarea>
             const interval = setInterval(async () => {
                 if (!isRunning) { clearInterval(interval); return; }
                 await executeStep();
-                const lines = document.getElementById('editor').value.split('\n').filter(l => l.trim() !== "");
+
+                const lines = document.getElementById('editor').value.split('\n')
+                    .map(line => line.split(';')[0].trim())
+                    .filter(l => l !== "");
+
                 if (cpu.PC >= lines.length) { clearInterval(interval); isRunning = false; }
             }, 1500);
         }
