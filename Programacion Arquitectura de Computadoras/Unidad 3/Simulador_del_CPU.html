@@ -3,16 +3,22 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>CPU Architecture Sim v2.8 - Fixed Default</title>
+    <title>Simulador_del_CPU</title>
     <style>
         :root {
+            /* Paleta basada en grises y azules de tu imagen */
             --bg-main: #d1d5db;
+            /* Gris medio suave para el fondo */
             --bg-stage: #e5e7eb;
+            /* Gris claro para el área de trabajo */
             --panel-side: #a2bff8ae;
-            /* El color exacto que solicitaste */
+            /* El color exacto semitransparente que solicitaste */
             --azure-dark: #0060ac;
+            /* Azul profundo de la paleta */
             --azure-bright: #4285f4;
+            /* Azul brillante */
             --orange-action: #ff7d3d;
+            /* Naranja para ejecución */
             --text-dark: #1f2937;
             --wire-color: #9ca3af;
         }
@@ -159,7 +165,7 @@
             overflow-y: auto;
         }
 
-        /* --- SVG Buses --- */
+        /* --- SVG Buses / Cables --- */
         #bus-system {
             position: absolute;
             width: 100%;
@@ -245,12 +251,12 @@ MOV CX, AX</textarea>
         </div>
 
         <div class="component" style="top: 280px; left: 70px;" id="reg-BX">
-            <span class="reg-label">BX - BASE</span>
+            <span class="reg-label">BX - REGISTRO BASE</span>
             <span class="reg-val" id="val-BX">0000</span>
         </div>
 
         <div class="component" style="top: 480px; left: 70px;" id="reg-CX">
-            <span class="reg-label">CX - CONTADOR</span>
+            <span class="reg-label">CX - REGISTRO CONTADOR</span>
             <span class="reg-val" id="val-CX">0000</span>
         </div>
 
@@ -267,7 +273,7 @@ MOV CX, AX</textarea>
         </div>
         <div class="component" style="top: 210px; right: 40px; width: 150px; border-color: #6b7280;" id="reg-IR">
             <span class="reg-label" style="color: #4b5563;">IR</span>
-            <span class="reg-val" style="font-size: 13px;" id="val-IR">IDLE</span>
+            <span class="reg-val" style="font-size: 13px;" id="val-IR">REPOSO</span>
         </div>
     </div>
 
@@ -290,23 +296,27 @@ MOV CX, AX</textarea>
     </div>
 
     <script>
-        let cpu = { AX: 0, BX: 0, CX: 0, PC: 0, IR: "IDLE" };
+        let cpu = { AX: 0, BX: 0, CX: 0, PC: 0, IR: "REPOSO" };
         let isRunning = false;
 
-        function log(msg) {
+        function log(msg, isHeader = false) {
             const m = document.getElementById('monitor');
-            m.innerHTML = `<span style="color:var(--azure-bright)">[T:${cpu.PC}]</span> ${msg}<br>` + m.innerHTML;
+            if (isHeader) {
+                m.innerHTML = msg + m.innerHTML;
+            } else {
+                m.innerHTML = `<span style="color:var(--azure-bright)">[T:${cpu.PC}]</span> ${msg}<br>` + m.innerHTML;
+            }
         }
 
         function toggleModal(show) { document.getElementById('modal').style.display = show ? 'block' : 'none'; }
 
         function resetCPU() {
-            cpu = { AX: 0, BX: 0, CX: 0, PC: 0, IR: "IDLE" };
+            cpu = { AX: 0, BX: 0, CX: 0, PC: 0, IR: "REPOSO" };
             document.getElementById('monitor').innerHTML = "";
             document.getElementById('alu-op').innerText = "---";
             document.querySelectorAll('.step-pill').forEach(s => s.classList.remove('active'));
             updateUI();
-            log("SISTEMA RESETEADO.");
+            log("REINICIO COMPLETADO.");
         }
 
         function updateUI(activeReg = null) {
@@ -320,23 +330,26 @@ MOV CX, AX</textarea>
         }
 
         async function executeStep() {
-            // Corrección: Separar comentarios usando el caracter ';' para evitar fallos de lectura
+            // Limpia líneas en blanco e ignora automáticamente comentarios que usen ';'
             const lines = document.getElementById('editor').value.split('\n')
-                .map(line => line.split(';')[0].trim()) // Ignora todo lo que esté después de un ';'
+                .map(line => line.split(';')[0].trim())
                 .filter(l => l !== "");
 
-            if (cpu.PC >= lines.length) { isRunning = false; return; }
+            if (cpu.PC >= lines.length) {
+                isRunning = false;
+                return;
+            }
 
             document.querySelectorAll('.step-pill').forEach(s => s.classList.remove('active'));
             document.querySelectorAll('.wire').forEach(w => w.classList.remove('wire-active'));
 
-            // FETCH
+            // FETCH (Búsqueda)
             document.getElementById('step-fetch').classList.add('active');
             cpu.IR = lines[cpu.PC].trim();
             updateUI('IR');
             await new Promise(r => setTimeout(r, 400));
 
-            // DECODE
+            // DECODE (Decodificación)
             document.getElementById('step-decode').classList.add('active');
             const parts = cpu.IR.replace(',', '').split(/\s+/);
             const op = parts[0].toUpperCase();
@@ -344,7 +357,7 @@ MOV CX, AX</textarea>
             const src = parts[2]?.toUpperCase();
             await new Promise(r => setTimeout(r, 400));
 
-            // EXECUTE
+            // EXECUTE (Ejecución)
             document.getElementById('step-execute').classList.add('active');
             const getVal = (v) => cpu.hasOwnProperty(v) ? cpu[v] : parseInt(v) || 0;
 
@@ -357,16 +370,23 @@ MOV CX, AX</textarea>
                 document.getElementById('w-ax-alu').classList.add('wire-active');
                 document.getElementById('w-bx-alu').classList.add('wire-active');
                 cpu[dest] += getVal(src);
-                log(`ADD: Operación en ALU`);
+                log(`ADD: Operación ALU`);
             } else if (op === "SUB") {
                 document.getElementById('alu-op').innerText = "-";
                 cpu[dest] -= getVal(src);
-                log(`SUB: Operación en ALU`);
+                log(`SUB: Operación ALU`);
             }
 
             setTimeout(() => { document.getElementById('alu-op').innerText = "---"; }, 800);
             cpu.PC++;
             updateUI(dest);
+
+            // Imprime el letrero naranja con el resultado acumulado final
+            if (cpu.PC === lines.length) {
+                setTimeout(() => {
+                    log(`<div style="color:#ff7d3d; font-weight:bold; margin: 5px 0; border-top: 1px dashed #ff7d3d; padding-top:5px;">[PROGRAMA TERMINADO]<br>Acumulador Final (AX) = ${cpu.AX}</div>`, true);
+                }, 900);
+            }
         }
 
         function runProgram() {
