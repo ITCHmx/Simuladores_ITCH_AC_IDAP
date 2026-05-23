@@ -2,408 +2,513 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Procesamiento en Paralelo</title>
-    <link rel="icon"
-        href="Logo.png"
-        type="image/x-icon">
+    <title>Simulador de Arquitectura: Núcleos y Multiprocesamiento - Avanzado</title>
     <style>
-        body { margin: 0; padding: 0; font-family: Arial, sans-serif; background: #000; overflow: hidden; }
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #000; overflow: hidden; }
         #escena { position: relative; width: 100%; height: 100vh; }
+        #fondo { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; z-index: -1; transition: opacity 0.4s ease; }
         
-        #fondo { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; z-index: -1; transition: opacity 0.2s ease; }
-        
-        /* Contenedor para agrupar personaje y texto */
+        /* Contenedor Personaje - FIJO A LA IZQUIERDA Y TAMAÑO AJUSTADO */
         #contenedor-personaje {
             position: absolute;
             bottom: 20px; 
+            left: 40px;
             display: flex;
-            flex-direction: column-reverse; /* Mensaje arriba, personaje abajo */
-            align-items: center; 
+            flex-direction: column-reverse; 
+            align-items: flex-start; 
             z-index: 1;
-            transition: all 0.5s ease-in-out; 
+            transition: all 0.5s ease-in-out;
         }
 
         #personaje { 
-            height: 500px; 
-            width: auto; 
+            height: 380px; 
+            width: auto;
             background-color: transparent !important;
-            margin-top: -30px; 
-            margin-bottom: 0px;
+            margin-top: 10px;
+            margin-bottom: 0px; 
             object-fit: contain;
-            object-position: bottom center;
+            object-position: bottom left;
+            filter: drop-shadow(0px 0px 15px rgba(0,0,0,0.5));
         }
 
         #mensaje {
-            background: rgba(255, 255, 255, 0.85); 
+            background: rgba(255, 255, 255, 0.92); 
             padding: 20px 30px;
             border-radius: 15px;
-            font-size: 20px;
+            font-size: 18px;
             font-weight: bold;
-            color: #000;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
-            max-width: 650px;
-            text-align: center;
+            color: #000; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            max-width: 540px;
+            max-height: 300px;
+            overflow-y: auto;
+            text-align: left;
             position: relative;
-            z-index: 2; 
+            line-height: 1.4;
+            border: 3px solid #007BFF;
         }
 
-        #mensaje h2 { font-size: 22px; margin: 0 0 10px 0; color: #007BFF; text-transform: uppercase; }
+        #mensaje h2 { font-size: 21px; margin: 0 0 10px 0; color: #007BFF; text-transform: uppercase; }
 
-        /* Triangulito del bocadillo */
         #mensaje::after {
             content: '';
             position: absolute;
-            bottom: -15px; 
-            left: 50%;
-            transform: translateX(-50%);
-            border-width: 15px 15px 0;
-            border-style: solid;
-            border-color: rgba(255, 255, 255, 0.85) transparent transparent; 
+            bottom: -15px; left: 50px;
+            border-width: 15px 15px 0; border-style: solid;
+            border-color: #007BFF transparent transparent; 
         }
 
-        /* Botones en la parte superior derecha */
-        .btn-nav { 
-            position: absolute; 
-            top: 20px; 
-            padding: 12px 25px; 
-            font-size: 16px; 
-            border: none; 
-            border-radius: 8px; 
-            cursor: pointer; 
-            color: white; 
-            z-index: 10; 
-            transition: all 0.3s ease; 
-            font-weight: bold;
-        }
-        
-        #btn-siguiente { right: 20px; background: #28a745; }
-        #btn-anterior { right: 200px; background: #6c757d; } 
-        
-        .btn-nav:hover { transform: scale(1.05); opacity: 0.9; }
-        .btn-nav:disabled { background: #ccc; cursor: not-allowed; }
-        .oculto { display: none !important; }
-
-        /* Elementos de Simulación de Rendimiento - Ajustado a la izquierda */
-        #simulacion-overlay {
+        /* Contenedor Simulador Activo - ESTILO NEÓN */
+        #contenedor-simulador {
             position: absolute;
-            top: 90px;
-            right: 150px; 
-            width: 55%; 
-            max-width: 750px;
-            background: rgba(15, 15, 25, 0.9);
-            border: 2px solid #007BFF;
-            border-radius: 15px;
-            padding: 20px;
-            display: flex;
-            gap: 25px;
-            color: #fff;
+            top: 50%;
+            right: 40px;
+            transform: translateY(-50%);
+            width: 600px;
+            height: 550px;
+            background: rgba(10, 10, 20, 0.95);
+            border: 2px solid #00ff66;
+            border-radius: 20px;
+            display: flex; 
+            flex-direction: column;
             z-index: 5;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            padding: 20px;
+            color: white;
             box-sizing: border-box;
+            box-shadow: 0 0 30px rgba(0, 255, 102, 0.3), inset 0 0 20px rgba(0,0,0,0.8);
         }
 
-        .panel-progreso { flex: 1.2; display: flex; flex-direction: column; justify-content: center; gap: 15px; }
-        .grupo-barra { display: flex; flex-direction: column; gap: 5px; }
-        .etiqueta-barra { font-weight: bold; font-size: 14px; color: #ddd; }
-        .barra-contenedor { background: #222; border: 1px solid #444; border-radius: 10px; padding: 2px; overflow: hidden; }
-        .barra { height: 22px; border-radius: 8px; width: 0%; display: flex; align-items: center; justify-content: flex-end; padding-right: 10px; font-size: 12px; font-weight: bold; box-sizing: border-box; }
-        .barra-rapida { background: linear-gradient(90deg, #28a745, #5cd65c); color: #fff; }
-        .barra-lenta { background: linear-gradient(90deg, #dc3545, #ff6b6b); color: #fff; }
-
-        /* Panel de Consola / Ejecución de Datos */
-        .panel-consola { 
-            flex: 1; 
-            background: #05050a; 
-            border: 1px solid #333;
-            border-radius: 12px; 
-            padding: 12px; 
-            font-family: 'Courier New', Courier, monospace; 
-            font-size: 12px; 
+        #pnl-tecnico { 
+            font-size: 16px; 
             color: #00ff66; 
-            height: 140px; 
-            overflow-y: hidden; 
-            box-shadow: inset 0 0 15px rgba(0,0,0,1);
+            margin-bottom: 15px; 
+            text-align: center; 
+            font-weight: bold;
+            background: #05050a;
+            padding: 12px;
+            border-radius: 10px;
+            min-height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #333;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        #escenario-maestro { 
+            width: 100%;
+            height: 100%;
+            position: relative;
+            background: #0a0a14;
+            border-radius: 10px;
+            padding: 15px;
+            box-sizing: border-box;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
-            justify-content: flex-end;
-            box-sizing: border-box;
+            border: 1px solid #222;
         }
-        .linea-log { margin: 2px 0; opacity: 0.9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+        /* ESTILOS DEL SIMULADOR VISUAL MEJORADOS */
+        .info-panel { font-family: 'Courier New', monospace; font-size: 13px; color: #a855f7; margin-bottom: 10px; text-align: center; height: 35px; text-shadow: 0 0 5px #a855f7; }
+        
+        .cpu-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-around;
+        }
+
+        .queue {
+            height: 55px; border: 2px dashed #007BFF; border-radius: 8px;
+            display: flex; align-items: center; padding: 5px; overflow: hidden;
+            background: rgba(0, 123, 255, 0.1);
+            position: relative;
+        }
+        .queue::before { content: 'RAM - Cola de Instrucciones'; position: absolute; top: -8px; left: 10px; font-size: 10px; background: #007BFF; padding: 2px 5px; color: #fff; font-family: monospace; border-radius: 3px; }
+
+        .task {
+            min-width: 18px; height: 25px; background: #00ff66; margin: 0 2px; border-radius: 4px;
+            box-shadow: 0 0 8px #00ff66; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .task.processing { background: #ffc107; box-shadow: 0 0 15px #ffc107; transform: scale(1.1); }
+        .task.done { background: #007BFF; opacity: 0; transform: translateY(-30px) scale(0.5); }
+
+        .cores-area {
+            display: grid; gap: 12px; flex: 1;
+            padding: 20px; background: #111; border-radius: 10px; border: 2px solid #334155;
+            position: relative;
+        }
+        .cores-area::before { content: 'CHIP DEL PROCESADOR FÍSICO'; position: absolute; top: -8px; left: 10px; font-size: 10px; background: #334155; padding: 2px 5px; color: #fff; font-weight: bold; border-radius:3px; }
+
+        .core {
+            border: 2px solid #007BFF; border-radius: 8px; background: rgba(0, 123, 255, 0.1);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: bold; color: #fff; transition: all 0.2s; position: relative;
+            overflow: hidden;
+        }
+        .core.active { background: rgba(255, 193, 7, 0.2); border-color: #ffc107; box-shadow: inset 0 0 15px rgba(255, 193, 7, 0.4); }
+
+        /* Componentes Internos del Core */
+        .core-component { padding: 4px 8px; margin: 2px; border-radius: 4px; font-size: 11px; background: #222; border: 1px solid #444; width: 80%; text-align: center; }
+        .alu-pulse { animation: pulsePurple 1s infinite alternate; background: rgba(168, 85, 247, 0.2); border-color: #a855f7; color: #e9d5ff; font-weight:bold; }
+        
+        @keyframes pulsePurple {
+            0%, 100% { box-shadow: 0 0 5px #a855f7; border-color: #a855f7; }
+            50% { box-shadow: 0 0 20px #a855f7; border-color: #d946ef; }
+        }
+
+        /* Layouts de Cores */
+        .grid-1 { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+        .grid-1-split { grid-template-columns: 1fr 1fr; gap: 20px; }
+        .grid-8 { grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 1fr); }
+
+        /* Hilos Virtuales (Hyper-threading) */
+        .thread-pipeline { width: 35px; height: 100px; border: 2px solid #007BFF; border-radius: 10px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; padding: 5px; background: rgba(0,0,0,0.5); position: relative; overflow: hidden; font-size:10px; }
+        .thread-container { display: flex; gap: 20px; width: 100%; justify-content: center; margin-top: 10px;}
+
+        /* Animación Caches */
+        .cache-block { margin-top: 8px; background: #6366f1; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; box-shadow: 0 0 10px #6366f1; padding: 5px; color: white; transition: background 0.3s; }
+        .cache-l1 { background: #17a2b8; box-shadow: 0 0 10px #17a2b8; font-size: 10px; padding: 4px; width: 80%; margin-top: auto; margin-bottom: 5px; border-radius:4px;}
+        .cache-l2 { background: #007BFF; box-shadow: 0 0 15px #007BFF; font-size: 12px; margin-top: 5px; }
+        .cache-l3 { background: #6f42c1; box-shadow: 0 0 20px #6f42c1; font-size: 12px; }
+        
+        /* Contenedor MESI específico */
+        .mesi-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; height: 200px;}
+        .mesi-data-block { width: 80px; height: 40px; border-radius: 8px; border: 2px solid white; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; margin: 10px auto; color: white; transition: all 0.4s;}
+        .state-m { background: #dc3545; box-shadow: 0 0 20px #dc3545; } /* Modificado */
+        .state-e { background: #007BFF; box-shadow: 0 0 20px #007BFF; } /* Exclusivo */
+        .state-s { background: #28a745; box-shadow: 0 0 20px #28a745; } /* Compartido */
+        .state-i { background: #6c757d; opacity: 0.5; } /* Inválido */
+
+        .btn-nav { position: absolute; top: 20px; padding: 12px 25px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; color: white; z-index: 10; transition: all 0.3s ease; font-weight: bold; text-transform: uppercase; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .btn-nav:hover { transform: scale(1.05); opacity: 0.9; }
+        #btn-siguiente { right: 40px; background: #28a745; }
+        #btn-anterior { right: 200px; background: #6c757d; }
+        .oculto { display: none !important; }
     </style>
 </head>
 <body onload="inicializarEscena()">
+
     <div id="escena">
-        <img id="fondo" src="" alt="Fondo">
-        
-        <div id="simulacion-overlay" class="oculto">
-            <div class="panel-progreso">
-                <div class="grupo-barra">
-                    <div class="etiqueta-barra">🚀 Red de 3 Computadoras (Procesamiento Paralelo)</div>
-                    <div class="barra-contenedor">
-                        <div id="barra-3pc" class="barra barra-rapida">0%</div>
-                    </div>
+        <img id="fondo" src="imagenes/Laboratorio_Entrada.jpg">
+
+        <div id="contenedor-simulador">
+            <div id="pnl-tecnico">Inicializando Simulador...</div>
+            <div id="escenario-maestro">
                 </div>
-                <div class="grupo-barra">
-                    <div class="etiqueta-barra">🐌 1 Computadora Sola (Procesamiento Secuencial)</div>
-                    <div class="barra-contenedor">
-                        <div id="barra-1pc" class="barra barra-lenta">0%</div>
-                    </div>
-                </div>
-            </div>
-            <div id="consola-logs" class="panel-consola"></div>
         </div>
 
         <div id="contenedor-personaje">
-            <div id="mensaje">Cargando...</div>
-            <img id="personaje" src="" alt="Locutor">
+            <div id="mensaje"></div>
+            <img id="personaje" src="">
         </div>
     </div>
 
-    <button id="btn-siguiente" class="btn-nav">Siguiente</button>
-    <button id="btn-anterior" class="btn-nav oculto">Anterior</button>
+    <button id="btn-siguiente" class="btn-nav">Siguiente ➔</button>
+    <button id="btn-anterior" class="btn-nav oculto">⬅ Anterior</button>
 
     <script>
+        let simuladorInterval;
+
         const escenas = [
             { 
-                fondo: "Dinosaurio/imagenes/Laboratorio_MonitorApagado.jpg", 
-                pers: "Dinosaurio/imagenes/Mapache_Saluda.png", 
-                msg: "¡Hola Mapaches! “La tarea que realizaremos será sumar todos los números del uno al novecientos mil. Es un cálculo grande, ideal para mostrar la diferencia entre hacerlo en una sola computadora y hacerlo en paralelo con tres computadoras conectadas en red.”", 
-                titulo: "Paso 1: Definición de la tarea",
-                simular: false 
+                fondo: "imagenes/Laboratorio_Entrada.jpg", pers: "imagenes/Mapache_Saluda.png", 
+                titulo: "UNIDAD 4: MULTIPROCESAMIENTO", modoSimulador: "intro",
+                msg: "\"¡Hola Mapaches! Sehan bienvenidos nuevamente a una de nuestras practicas.\n\nhoy no conectaremos computadoras, sino que viajaremos <b>al interior del chip de silicio</b> para entender las Organizaciones Paralelas y los Multiprocesadores de Chips.\""
             },
             { 
-                fondo: "Dinosaurio/imagenes/2B.png", 
-                pers: "Dinosaurio/imagenes/Mapache_Explica_ConDedo.png", 
-                msg: "“Primero cargamos la tarea completa en una sola computadora. El simulador muestra cómo el sistema recibe la instrucción, pero aún no la ejecutaremos. La tarea queda lista, esperando a ser procesada.”", 
-                titulo: "Paso 2: Carga de la tarea en una computadora",
-                simular: false 
+                fondo: "imagenes/Laboratorio_Puerta.jpg", pers: "imagenes/Mapache_Izquierda.png", 
+                titulo: "ANATOMÍA DE UN NÚCLEO", modoSimulador: "core-explicacion",
+                msg: "\"Primero, observemos el interior de 1 solo Núcleo (Core).\n\nUn núcleo no es una caja mágica; tiene componentes que 'palpitan' con el reloj de la computadora. Tiene la <b>ALU</b> (el cerebro matemático en morado), <b>Registros</b> (memoria ultrarrápida) y la <b>Unidad de Control</b> que dirige el tráfico.\""
             },
             { 
-                fondo: "Dinosaurio/imagenes/3B.png", 
-                pers: "Dinosaurio/imagenes/Mapache_ManosAbiertas.png", 
-                msg: "*“Ahora cargamos la misma tarea en tres computadoras conectadas en red. Dividimos el cálculo en tres bloques:<br><br><b>PC1:</b> suma del uno al trescientos mil.<br><b>PC2:</b> suma del trescientos uno mil al seiscientos mil.<br><b>PC3:</b> suma del seiscientos uno mil al novecientos mil.<br><br>Cada computadora recibe su parte de la tarea.”*", 
-                titulo: "Paso 3: Carga de la tarea en tres computadoras",
-                simular: false 
+                fondo: "imagenes/Laboratorio_Animado.jpg", pers: "imagenes/Mapache_Explica_ConDedo.png", 
+                titulo: "PROCESAMIENTO SECUENCIAL (1 NÚCLEO)", modoSimulador: "single-core",
+                msg: "\"¡Miren la simulación! En un procesador antiguo (Single-Core), las tareas de la RAM (los bloques verdes) deben hacer fila.\n\nEl núcleo atiende una por una. Por más rápido que sea su pulso, se genera un cuello de botella terrible si tienes muchas ventanas de programas abiertas.\""
             },
             { 
-                fondo: "Dinosaurio/imagenes/1B.png", 
-                pers: "Dinosaurio/imagenes/Mapache_Explica_ConDedo.png", 
-                msg: "“El simulador inicia la ejecución en ambos escenarios: la computadora sola comienza a procesar su tarea completa, mientras que las tres computadoras trabajan en paralelo con sus bloques asignados. Observamos cómo los resultados parciales de las tres PCs se combinan rápidamente en un archivo compartido.”", 
-                titulo: "Paso 4: Ejecución simultánea",
-                simular: true 
+                fondo: "imagenes/Laboratorio_Animado.jpg", pers: "imagenes/Mapache_Explica_ConDedo.png", 
+                titulo: "TEMA 4.4.1: SUBPROCESOS (HYPER-THREADING)", modoSimulador: "hyper-threading",
+                msg: "\"Antes de meter más núcleos físicos, los ingenieros inventaron el 'Subproceso Múltiple Implícito' (Hyper-threading).\n\n¡Es un truco genial! Engañan al Sistema Operativo haciéndole creer que hay 2 procesadores. El núcleo divide sus recursos internos en <b>dos tuberías (hilos)</b> para procesar dos tareas a la vez de forma entrelazada.\""
             },
             { 
-                fondo: "Dinosaurio/imagenes/3B.png", 
-                pers: "Dinosaurio/imagenes/Mapache_ManosAbiertas.png", 
-                msg: "“Como se logra ver, las tres computadoras terminaron primero.”", 
-                titulo: "Paso 5: Comparison de resultados",
-                simular: true 
+                fondo: "imagenes/Laboratorio_Animado.jpg", pers: "imagenes/Mapache_ManosAbiertas.png", 
+                titulo: "TEMA 4.1.2: ORGANIZACIONES PARALELAS", modoSimulador: "octa-core-estatico",
+                msg: "\"¡Pero la verdadera potencia llega con el Hardware Físico: El procesador Multicore (Octa-Core)!\n\nAquí literalmente clonamos la circuitería completa 8 veces dentro de la misma pastilla de silicio. ¡Tenemos 8 cerebros independientes listos para la acción!\""
             },
             { 
-                fondo: "Dinosaurio/imagenes/2B.png", 
-                pers: "Dinosaurio/imagenes/Mapache_Explica_ConDedo.png", 
-                msg: "“...mientras que la computadora sola continúa procesando y parece que tardará un poco más en llegar al resultado final.”", 
-                titulo: "Paso 5: Comparación de resultados",
-                simular: true 
+                fondo: "imagenes/Laboratorio_Animado.jpg", pers: "imagenes/Mapache_ManosAbiertas.png", 
+                titulo: "EJECUCIÓN EN PARALELO REAL", modoSimulador: "octa-core-animado",
+                msg: "\"¡Observen la tremenda diferencia de velocidad!\n\nEste es el subproceso múltiple explícito. El trabajo pesado se divide en 8 fracciones y se resuelve simultáneamente. Una tarea que le tomaba 32 ciclos al Single-Core, ¡aquí se termina en solo 4 ciclos!\""
             },
             { 
-                fondo: "Dinosaurio/imagenes/3B.png", 
-                pers: "Dinosaurio/imagenes/Mapache_Saluda.png", 
-                msg: "“Esto demuestra la ventaja del procesamiento paralelo distribuido: dividir el trabajo entre varios equipos reduce el tiempo total de ejecución.”", 
-                titulo: "Paso 5: Comparación de resultados",
-                simular: true /* Cambiado a true para que el simulador se mantenga visible en esta escena */
+                fondo: "imagenes/Laboratorio_Puerta.jpg", pers: "imagenes/Mapache_Izquierda.png", 
+                titulo: "JERARQUÍA DE MEMORIA CACHÉ", modoSimulador: "jerarquia-cache",
+                msg: "\"Pero hay un problema de diseño: La RAM es demasiado lenta para alimentar a 8 bestias trabajando juntas.\n\nPara solucionarlo, se incrustan Memorias Caché (SRAM) dentro del chip. Una <b>L1</b> privada por núcleo, una <b>L2</b> unificada por clúster, y una gran <b>L3</b> que todos comparten.\""
             },
             { 
-                fondo: "Dinosaurio/imagenes/5B.png", 
-                pers: "Dinosaurio/imagenes/Mapache_ManosAbiertas.png", 
-                msg: "*“Este mismo principio se aplica en muchos ámbitos tecnológicos que usamos día a día. Por ejemplo, en el renderizado de películas o animaciones digitales, los estudios dividen cada escena en fragmentos y los procesan en paralelo en varias computadoras, reduciendo semanas de trabajo a solo días.”*", 
-                titulo: "Paso 6: Ejemplos cercanos y fáciles de entender",
-                simular: false 
+                fondo: "imagenes/Laboratorio_Animado.jpg", pers: "imagenes/Mapache_Explica_ConDedo.png", 
+                titulo: "TEMA 4.3.3: PROTOCOLO MESI", modoSimulador: "mesi-detallado",
+                msg: "\"¿Qué pasa si dos núcleos quieren modificar la MISMA variable en su Caché L1 al mismo tiempo?\n\n¡Usan el Protocolo MESI por hardware! Observen la simulación: los datos cambian de estado entre Exclusivo (Azul), Compartido (Verde), Modificado (Rojo) o se Invalidan (Gris) para que las matemáticas no se corrompan.\""
             },
             { 
-                fondo: "Dinosaurio/imagenes/6B.png", 
-                pers: "Dinosaurio/imagenes/Mapache_Explica_ConDedo.png", 
-                msg: "*“También ocurre en las plataformas de redes sociales, donde millones de publicaciones se procesan en paralelo en servidores distribuidos para que los usuarios reciban contenido al instante.”*", 
-                titulo: "Paso 6: Ejemplos cercanos y fáciles de entender",
-                simular: false 
-            },
-            { 
-                fondo: "Dinosaurio/imagenes/7B.png", 
-                pers: "Dinosaurio/imagenes/Mapache_ManosAbiertas.png", 
-                msg: "*“Incluso en el análisis de grandes volúmenes de datos (Big Data), la información se reparte entre distintos servidores que trabajan simultáneamente, logrando resultados que serían imposibles para una sola máquina.”*", 
-                titulo: "Paso 6: Ejemplos cercanos y fáciles de entender",
-                simular: false 
-            },
-            { 
-                fondo: "Dinosaurio/imagenes/4B.png", 
-                pers: "Dinosaurio/imagenes/Mapache_Saluda.png", 
-                msg: "*“En todos los casos, el objetivo es el mismo: aprovechar la colaboración para obtener resultados más rápidos y eficientes.”*", 
-                titulo: "Paso 6: Ejemplos cercanos y fáciles de entender",
-                simular: false 
+                fondo: "imagenes/Laboratorio_Entrada.jpg", pers: "imagenes/Mapache_Saluda.png", 
+                titulo: "SIMULACIÓN COMPLETADA", modoSimulador: "fin",
+                msg: "\"¡Impresionante, verdad!\n\nHoy hemos analizado desde los subprocesos de un núcleo hasta la coherencia de caché de un Clúster de chips. ¡Con esto tienen dominados los conceptos base de la Unidad 4!\""
             }
         ];
 
         let indice = 0;
-        let simInterval = null;
-        let logInterval = null;
-        let progresoRapido = 0;
-        let progresoLento = 0;
 
-        const btnSig = document.getElementById("btn-siguiente");
-        const btnAnt = document.getElementById("btn-anterior");
-        const fondo = document.getElementById("fondo");
-        const personaje = document.getElementById("personaje");
-        const mensaje = document.getElementById("mensaje");
-        const contenedor = document.getElementById("contenedor-personaje");
-        const simulacionOverlay = document.getElementById("simulacion-overlay");
-        const barra3PC = document.getElementById("barra-3pc");
-        const barra1PC = document.getElementById("barra-1pc");
-        const consolaLogs = document.getElementById("consola-logs");
+        function renderizarSimulador(modo) {
+            const escenario = document.getElementById("escenario-maestro");
+            clearInterval(simuladorInterval); 
 
-        function ajustarPosicionContenedor(numEscena) {
-            contenedor.style.left = "auto";
-            contenedor.style.right = "auto";
-            contenedor.style.transform = "none";
+            let html = "";
 
-            // Escena 1 (índice 0): Centro
-            if (numEscena === 0) {
-                contenedor.style.left = "50%";
-                contenedor.style.transform = "translateX(-50%)";
+            if (modo === "intro" || modo === "fin") {
+                html = `<div style="display:flex; height:100%; align-items:center; justify-content:center; flex-direction:column; color:#00ff66; font-family: monospace; text-align: center;">
+                            <h1 style="font-size:50px; margin:0; text-shadow: 0 0 20px #00ff66;">${modo === 'intro' ? '🔬' : '✅'}</h1>
+                            <h2 style="color:white; margin-bottom:5px;">${modo === 'intro' ? 'SISTEMA EN ESPERA' : 'PRÁCTICA FINALIZADA'}</h2>
+                            <p style="color:#a855f7">${modo === 'intro' ? 'Preparando escaneo del chip...' : 'Hardware dominado al 100%'}</p>
+                        </div>`;
+                escenario.innerHTML = html;
             } 
-            // A partir de Escena 2 (índice 1) hasta que termine el simulador (ahora extendido hasta el índice 6)
-            else if (numEscena >= 1 && numEscena <= 6) {
-                contenedor.style.left = "40px";
+            else if (modo === "core-explicacion") {
+                html = `<div class="cpu-container">
+                            <div class="info-panel">Arquitectura de Von Neumann Interna</div>
+                            <div class="cores-area grid-1" style="height: 350px;">
+                                <div class="core active" style="font-size: 16px;">
+                                    <div class="core-component" style="background:#007BFF; color:white; border-color:#007BFF;">Unidad de Control (CU)</div>
+                                    <div style="height: 20px; width: 2px; background: #00ff66; box-shadow: 0 0 10px #00ff66; margin: 5px 0;"></div>
+                                    <div class="core-component alu-pulse" style="padding: 15px; font-size: 16px;">ALU (Aritmético-Lógica)</div>
+                                    <div style="height: 20px; width: 2px; background: #00ff66; box-shadow: 0 0 10px #00ff66; margin: 5px 0;"></div>
+                                    <div class="core-component" style="background:#17a2b8; color:white; border-color:#17a2b8;">Banco de Registros</div>
+                                    <div class="cache-l1">Caché L1</div>
+                                </div>
+                            </div>
+                        </div>`;
+                escenario.innerHTML = html;
             }
-            // Después del simulador
+            else if (modo === "hyper-threading") {
+                html = `<div class="info-panel" id="info-status">Modo SMT: 1 Núcleo / 2 Hilos Lógicos</div>
+                        <div class="cpu-container">
+                            <div class="queue" id="cola"></div>
+                            <div class="cores-area grid-1">
+                                <div class="core active">
+                                    <span style="font-size:14px; color:#ffc107;">Core Físico Único</span>
+                                    <div class="thread-container">
+                                        <div class="thread-pipeline" id="hilo-1">Hilo 0<div style="width:100%; height:100%; background:#00ff66; position:absolute; bottom:0; opacity:0; transition:0.2s;" id="ta-1"></div></div>
+                                        <div class="thread-pipeline" id="hilo-2">Hilo 1<div style="width:100%; height:100%; background:#007BFF; position:absolute; bottom:0; opacity:0; transition:0.2s;" id="ta-2"></div></div>
+                                    </div>
+                                    <div class="cache-l1" style="margin-top:15px;">Caché L1 Compartida</div>
+                                </div>
+                            </div>
+                        </div>`;
+                escenario.innerHTML = html;
+                llenarCola(16);
+                arrancarAnimacionHT();
+            }
+            else if (modo === "jerarquia-cache") {
+                html = `<div class="info-panel">Estructura Física del Chip Multicore</div>
+                        <div class="cpu-container">
+                            <div class="cores-area grid-1-split" style="height:150px; background: transparent; border: none;">
+                                <div class="core" style="border-color:#00ff66;">Core 1 <div class="cache-l1">Caché L1 (Privada)</div></div>
+                                <div class="core" style="border-color:#00ff66;">Core 2 <div class="cache-l1">Caché L1 (Privada)</div></div>
+                            </div>
+                            <div class="cache-block cache-l2" style="height: 40px; margin: 10px 20px;">Caché L2 (Unificada por Clúster)</div>
+                            <div style="height: 15px; width: 4px; background: #ffc107; margin: 0 auto;"></div>
+                            <div class="cache-block cache-l3" style="height: 60px; margin: 10px;">Caché L3 (Global - Compartida por los 8 Cores)</div>
+                            <div style="height: 15px; width: 4px; background: #dc3545; margin: 0 auto;"></div>
+                            <div class="cache-block" style="height: 40px; background: #111; border: 2px dashed #444; color: #888; box-shadow:none;">Bus de Memoria hacia RAM Externa</div>
+                        </div>`;
+                escenario.innerHTML = html;
+            }
+            else if (modo === "mesi-detallado") {
+                html = `<div class="info-panel" id="mesi-status">Analizando coherencia de variable 'X'...</div>
+                        <div class="cpu-container" style="justify-content: flex-start;">
+                            <div class="mesi-grid">
+                                <div class="core active" style="border-color:#007BFF;" id="mesi-c1-box">
+                                    <span style="font-size:14px; color:white;">Core 1</span>
+                                    <div class="mesi-data-block state-i" id="mesi-c1">Inválido</div>
+                                    <div class="cache-l1">Caché L1</div>
+                                </div>
+                                <div class="core active" style="border-color:#007BFF;" id="mesi-c2-box">
+                                    <span style="font-size:14px; color:white;">Core 2</span>
+                                    <div class="mesi-data-block state-i" id="mesi-c2">Inválido</div>
+                                    <div class="cache-l1">Caché L1</div>
+                                </div>
+                            </div>
+                            <div class="cache-block" style="height: 50px; background: #007BFF; margin-top:20px; box-shadow: 0 0 15px #007BFF;" id="mesi-bus">
+                                Bus del Sistema (Snooping)
+                            </div>
+                            <div class="cache-block" style="background: #222; border-color:#444; box-shadow:none;">RAM: X = 10</div>
+                        </div>`;
+                escenario.innerHTML = html;
+                arrancarAnimacionMESI();
+            }
             else {
-                const posicionSecundaria = numEscena % 2;
-                if (posicionSecundaria === 0) {
-                     contenedor.style.right = "80px";
-                } else {
-                     contenedor.style.left = "50%";
-                     contenedor.style.transform = "translateX(-50%)";
+                // Modos Single y Octa
+                const numCores = (modo === "single-core") ? 1 : 8;
+                const gridClass = (modo === "single-core") ? "grid-1" : "grid-8";
+                
+                let coresHTML = "";
+                for (let i = 1; i <= numCores; i++) {
+                    coresHTML += `<div class="core" id="core-${i}">Core ${i}<div class="cache-l1">L1</div></div>`;
                 }
+
+                html = `
+                    <div class="info-panel" id="info-status" style="color:#00ff66;">Estado: Preparando tareas...</div>
+                    <div class="cpu-container">
+                        <div class="queue" id="cola"></div>
+                        <div class="cores-area ${gridClass}">
+                            ${coresHTML}
+                        </div>
+                    </div>
+                `;
+                escenario.innerHTML = html;
+                llenarCola(32);
+
+                if (modo === "single-core") arrancarAnimacionNormal(1, 400); 
+                if (modo === "octa-core-animado") arrancarAnimacionNormal(8, 200); 
             }
         }
 
-        function actualizarUI() {
-            if (indice > 0) btnAnt.classList.remove("oculto");
-            else btnAnt.classList.add("oculto");
-            btnSig.innerText = (indice === escenas.length - 1) ? "Terminar" : "Siguiente";
+        function llenarCola(cantidad) {
+            const cola = document.getElementById("cola");
+            let tareasHTML = "";
+            for (let i = 1; i <= cantidad; i++) {
+                tareasHTML += `<div class="task" id="task-${i}"></div>`;
+            }
+            cola.innerHTML = tareasHTML;
         }
 
-        function limpiarSimulacion() {
-            clearInterval(simInterval);
-            clearInterval(logInterval);
-            simInterval = null;
-            logInterval = null;
-            progresoRapido = 0;
-            progresoLento = 0;
-            barra3PC.style.width = "0%";
-            barra3PC.innerText = "0%";
-            barra1PC.style.width = "0%";
-            barra1PC.innerText = "0%";
-            consolaLogs.innerHTML = "";
+        function arrancarAnimacionNormal(numCores, velocidad) {
+            let tareasEnCola = 32; let ciclo = 0;
+            const infoStatus = document.getElementById("info-status");
+
+            simuladorInterval = setInterval(() => {
+                for (let i = 1; i <= numCores; i++) {
+                    let c = document.getElementById(`core-${i}`);
+                    if(c) { c.classList.remove("active"); c.style.borderColor = "#007BFF"; }
+                }
+
+                if (tareasEnCola > 0) {
+                    let ejecutadasEsteCiclo = Math.min(numCores, tareasEnCola);
+                    
+                    for (let i = 1; i <= ejecutadasEsteCiclo; i++) {
+                        let taskId = 32 - tareasEnCola + 1;
+                        let taskDOM = document.getElementById(`task-${taskId}`);
+                        if (taskDOM) taskDOM.classList.add("done"); 
+                        
+                        let coreDOM = document.getElementById(`core-${i}`);
+                        if (coreDOM) {
+                            coreDOM.classList.add("active");
+                            coreDOM.style.borderColor = "#ffc107";
+                        }
+                        tareasEnCola--;
+                    }
+                    ciclo++;
+                    infoStatus.innerText = `[Reloj] Ciclos ejecutados: ${ciclo} | Rendimiento: ${numCores} IPC`;
+                } else {
+                    infoStatus.innerText = `¡Carga completada en ${ciclo} ciclos exactos!`;
+                    infoStatus.style.color = "#ffc107";
+                    clearInterval(simuladorInterval);
+                }
+            }, velocidad);
         }
 
-        function ejecutarSimulacion() {
-            if (simInterval !== null) return; 
+        function arrancarAnimacionHT() {
+            let tareasEnCola = 16;
+            const ta1 = document.getElementById("ta-1");
+            const ta2 = document.getElementById("ta-2");
+            
+            simuladorInterval = setInterval(() => {
+                if(tareasEnCola <= 0) { clearInterval(simuladorInterval); return; }
+                
+                // Hilo 1 toma tarea
+                let t1 = document.getElementById(`task-${16 - tareasEnCola + 1}`);
+                if(t1) t1.classList.add("done");
+                ta1.style.opacity = 1; setTimeout(()=> ta1.style.opacity = 0, 300);
+                tareasEnCola--;
 
-            simInterval = setInterval(() => {
-                if (progresoRapido < 100) {
-                    progresoRapido += Math.floor(Math.random() * 5) + 5;
-                    if (progresoRapido > 100) progresoRapido = 100;
-                    barra3PC.style.width = progresoRapido + "%";
-                    barra3PC.innerText = progresoRapido + "%";
+                // Hilo 2 toma tarea (casi al instante, entrelazado)
+                if(tareasEnCola > 0) {
+                    setTimeout(() => {
+                        let t2 = document.getElementById(`task-${16 - tareasEnCola + 1}`);
+                        if(t2) t2.classList.add("done");
+                        ta2.style.opacity = 1; setTimeout(()=> ta2.style.opacity = 0, 300);
+                        tareasEnCola--;
+                    }, 250);
                 }
+            }, 600);
+        }
 
-                if (progresoLento < 35) {
-                    progresoLento += (Math.random() * 1.2);
-                } else if (progresoLento < 100) {
-                    progresoLento += 0.05;
-                }
-
-                let displayLento = Math.min(Math.floor(progresoLento), 100);
-                barra1PC.style.width = displayLento + "%";
-                barra1PC.innerText = displayLento + "%";
-            }, 150);
-
-            const operaciones = [
-                "PC1: Procesando bloque [1 - 75000]...",
-                "PC2: Procesando bloque [300001 - 375000]...",
-                "PC3: Procesando bloque [600001 - 675000]...",
-                "PC1: Suma parcial acumulada = 2,812,537,500",
-                "PC2: Suma parcial acumulada = 25,312,537,500",
-                "PC3: Suma parcial acumulada = 47,812,537,500",
-                "Sola: Procesando bucle secuencial iteración 42800...",
-                "PC1: Bloque 1 Completado ✔",
-                "PC2: Procesando bloque [375001 - 450000]...",
-                "PC3: Bloque 1 Completado ✔",
-                "Sola: Memoria RAM al 78% (Hilo único)...",
-                "PC3: Combinando resultados en archivo central...",
-                "PC1 & PC2 & PC3: ¡Sincronización de registros exitosa!",
-                "Sola: Procesando bucle secuencial iteración 112400..."
+        function arrancarAnimacionMESI() {
+            const status = document.getElementById("mesi-status");
+            const c1 = document.getElementById("mesi-c1");
+            const c2 = document.getElementById("mesi-c2");
+            const b1 = document.getElementById("mesi-c1-box");
+            const bus = document.getElementById("mesi-bus");
+            
+            let paso = 0;
+            const pasos = [
+                { msg: "Core 1 lee Variable X. Nadie más la tiene.", c1c: "state-e", c1t: "Exclusivo", c2c: "state-i", c2t: "Inválido", busColor: "#007BFF" },
+                { msg: "Core 2 también lee Variable X. Ambos comparten.", c1c: "state-s", c1t: "Compartido", c2c: "state-s", c2t: "Compartido", busColor: "#28a745" },
+                { msg: "¡Peligro! Core 1 modifica X. Avisa al Bus.", c1c: "state-m", c1t: "Modificado", c2c: "state-i", c2t: "Inválido", busColor: "#dc3545" },
+                { msg: "Core 2 debe descartar su dato viejo (Inválido).", c1c: "state-m", c1t: "Modificado", c2c: "state-i", c2t: "Inválido", busColor: "#dc3545" }
             ];
 
-            logInterval = setInterval(() => {
-                const lineaAleatoria = operaciones[Math.floor(Math.random() * operaciones.length)];
-                const timestamp = new Date().toLocaleTimeString().split(' ')[0];
+            simuladorInterval = setInterval(() => {
+                let p = pasos[paso % pasos.length];
+                status.innerText = `MESI: ${p.msg}`;
                 
-                const div = document.createElement("div");
-                div.className = "linea-log";
-                div.innerHTML = `<span style="color: #007BFF;">[${timestamp}]</span> ${lineaAleatoria}`;
-                consolaLogs.appendChild(div);
+                c1.className = `mesi-data-block ${p.c1c}`; c1.innerText = p.c1t;
+                c2.className = `mesi-data-block ${p.c2c}`; c2.innerText = p.c2t;
+                bus.style.background = p.busColor;
+                bus.style.boxShadow = `0 0 15px ${p.busColor}`;
 
-                if (consolaLogs.childNodes.length > 6) {
-                    consolaLogs.removeChild(consolaLogs.firstChild);
-                }
-            }, 400);
+                if(p.c1c === "state-m") { b1.style.borderColor = "#dc3545"; } else { b1.style.borderColor = "#007BFF"; }
+                
+                paso++;
+            }, 3000);
         }
 
         function cambiarEscena(nuevoIndice) {
             indice = nuevoIndice;
             const escena = escenas[indice];
-            fondo.style.opacity = 0;
-            
-            if (escena.simular) {
-                simulacionOverlay.classList.remove("oculto");
-                ejecutarSimulacion(); 
-            } else {
-                simulacionOverlay.classList.add("oculto");
-                if (indice < 3 || indice > 6) {
-                    limpiarSimulacion();
-                }
-            }
+            const fondo = document.getElementById("fondo");
+            const personaje = document.getElementById("personaje");
+            const mensaje = document.getElementById("mensaje");
 
+            fondo.style.opacity = 0;
             setTimeout(() => {
                 fondo.src = escena.fondo;
                 personaje.src = escena.pers;
                 
                 let tituloHTML = escena.titulo ? `<h2>${escena.titulo}</h2>` : "";
-                mensaje.innerHTML = tituloHTML + escena.msg;
+                mensaje.innerHTML = tituloHTML + escena.msg.replace(/\n/g, "<br>");
+                document.getElementById("pnl-tecnico").innerText = escena.titulo;
                 
-                ajustarPosicionContenedor(indice);
-                actualizarUI();
+                renderizarSimulador(escena.modoSimulador);
+                
+                document.getElementById("btn-anterior").classList.toggle("oculto", indice === 0);
+                document.getElementById("btn-siguiente").innerText = (indice === escenas.length - 1) ? "Finalizar" : "Siguiente";
                 fondo.style.opacity = 1;
-            }, 150);
+            }, 200);
         }
 
-        function inicializarEscena() {
-            cambiarEscena(0);
-        }
+        function inicializarEscena() { cambiarEscena(0); }
 
-        btnSig.addEventListener("click", () => {
-            if (indice < escenas.length - 1) cambiarEscena(indice + 1);
-            else alert("¡Felicidades, has aprendido cómo trabaja el procesamiento en paralelo con los Mapaches!");
+        document.getElementById("btn-siguiente").addEventListener("click", () => { 
+            if (indice < escenas.length - 1) cambiarEscena(indice + 1); 
         });
-
-        btnAnt.addEventListener("click", () => {
-            if (indice > 0) {
-                if (indice === 7 || indice === 3) {
-                     limpiarSimulacion();
-                }
-                cambiarEscena(indice - 1);
-            }
+        
+        document.getElementById("btn-anterior").addEventListener("click", () => { 
+            if (indice > 0) cambiarEscena(indice - 1); 
         });
     </script>
 </body>
