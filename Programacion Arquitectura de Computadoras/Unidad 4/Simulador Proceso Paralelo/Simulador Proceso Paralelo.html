@@ -1,367 +1,301 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <title>Simulador de procesos paralelos</title>
-    <link rel="icon"
-        href="Logo.png"
-        type="image/x-icon">
-    <style>
-        body { margin: 0; padding: 0; font-family: Arial, sans-serif; background: #000; overflow: hidden; }
-        #escena { position: relative; width: 100%; height: 100vh; }
-        
-        #fondo { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; z-index: -1; transition: opacity 0.2s ease; }
-        
-        /* --- Contenedor de Capturas de Pantalla --- */
-        #contenedor-capturas {
-            position: absolute;
-            top: 80px;
-            left: 540px; /* Posición base por defecto */
-            width: 390px;
-            height: 440px;
-            z-index: 2;
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            box-sizing: border-box;
-            transition: left 0.3s ease, top 0.3s ease, width 0.3s ease, height 0.3s ease; /* Transiciones suaves */
-        }
-        #img-captura {
-            max-width: 100%;
-            max-height: 85%;
-            object-fit: contain;
-            border: 3px solid #fff;
-            border-radius: 8px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.6);
-        }
-        #btn-cambiar-img {
-            margin-top: 10px;
-            padding: 6px 16px;
-            background: #22c55e;
-            color: white;
-            border: none;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-            transition: background 0.2s;
-        }
-        #btn-cambiar-img:hover { background: #16a34a; }
+<meta charset="UTF-8">
+<title>Simulador: Escalando a 8 Octa-Cores</title>
+<style>
+  body { margin: 0; padding: 0; font-family: Arial, sans-serif; background: #000; overflow: hidden; }
+  #escena { position: relative; width: 100%; height: 100vh; }
+  #fondo { width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0; z-index: -1; transition: opacity 0.4s ease; }
+  
+  /* Contenedor Personaje - FIJO A LA IZQUIERDA SIEMPRE */
+  #contenedor-personaje { position: absolute; bottom: 20px; left: 40px; display: flex; flex-direction: column-reverse; align-items: flex-start; z-index: 1; }
+  
+  /* Mapache más pequeño para que no tope arriba */
+  #personaje { height: 380px; width: auto; background-color: transparent !important; margin-top: 10px; margin-bottom: 0px; object-fit: contain; object-position: bottom left; filter: drop-shadow(0px 0px 15px rgba(0,0,0,0.5)); }
+  
+  #mensaje { background: rgba(255, 255, 255, 0.92); padding: 20px 30px; border-radius: 15px; font-size: 18px; font-weight: bold; color: #000; box-shadow: 0 5px 15px rgba(0,0,0,0.4); max-width: 500px; text-align: left; position: relative; z-index: 2; line-height: 1.4; border: 3px solid #007BFF; }
+  #mensaje h2 { font-size: 21px; margin: 0 0 10px 0; color: #007BFF; text-transform: uppercase; }
+  #mensaje::after { content: ''; position: absolute; bottom: -15px; left: 50px; border-width: 15px 15px 0; border-style: solid; border-color: #007BFF transparent transparent; }
+  
+  /* Botones de navegación */
+  .btn-nav { position: absolute; top: 20px; padding: 12px 25px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; color: white; z-index: 10; transition: all 0.3s ease; font-weight: bold; box-shadow: 0 4px 15px rgba(0,0,0,0.5); text-transform: uppercase; }
+  .btn-nav:hover { transform: scale(1.05); opacity: 0.9; }
+  #btn-siguiente { right: 40px; background: #28a745; }
+  #btn-anterior { right: 200px; background: #6c757d; }
+  .oculto { display: none !important; }
 
-        /* Contenedor Personaje (Ubicado a la izquierda para no obstruir el simulador) */
-        #contenedor-personaje {
-            position: absolute;
-            bottom: 20px; 
-            left: 40px;
-            display: flex;
-            flex-direction: column-reverse; 
-            align-items: center; 
-            z-index: 1;
-            transition: all 0.5s ease-in-out;
-        }
+  /* Contenedor Simulador Activo a la Derecha */
+  #contenedor-simulador { position: absolute; top: 90px; right: 40px; width: 650px; height: 550px; background: rgba(10, 10, 20, 0.95); border: 2px solid #00ff66; border-radius: 15px; display: flex; flex-direction: column; z-index: 5; padding: 20px; color: white; box-sizing: border-box; box-shadow: 0 10px 30px rgba(0,255,102,0.3); }
+  #pnl-tecnico { font-size: 16px; color: #00ff66; margin-bottom: 15px; text-align: center; font-weight: bold; background: #05050a; padding: 10px; border-radius: 10px; border: 1px solid #333; font-family: 'Courier New', Courier, monospace; letter-spacing: 1px; }
+  #escenario-maestro { width: 100%; height: 100%; position: relative; background: #0a0a14; border-radius: 10px; padding: 15px; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; border: 1px solid #222; justify-content: center; align-items: center; }
+  
+  /* Animaciones y Estilos del Hardware */
+  @keyframes packetMove { 0% { left: 5%; opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { left: 95%; opacity: 0; } }
+  @keyframes flashRed { 0%, 100% { box-shadow: 0 0 10px #dc3545; background: rgba(220, 53, 69, 0.2); } 50% { box-shadow: 0 0 25px #dc3545; background: rgba(220, 53, 69, 0.5); } }
+  @keyframes pulseBlue { 0%, 100% { box-shadow: inset 0 0 10px #007BFF; } 50% { box-shadow: inset 0 0 25px #007BFF; background: rgba(0, 123, 255, 0.2); } }
+  @keyframes activeCore { 0%, 100% { background: #00ff66; } 50% { background: #007BFF; } }
 
-        #personaje { 
-            height: 390px; 
-            background-color: transparent !important;
-            margin-bottom: -5px; 
-            object-position: bottom center;
-        }
-
-        #mensaje {
-            background: rgba(255,255,255,0.60); 
-            padding: 20px 30px;
-            border-radius: 15px;
-            font-size: 16px;
-            font-weight: bold;
-            color: #000; 
-            box-shadow: 0 5px 15px rgba(0,0,0,0.4);
-            max-width: 550px;
-            max-height: 280px;
-            overflow-y: auto;
-            text-align: left;
-            position: relative;
-            line-height: 1.4;
-        }
-
-        #mensaje::after {
-            content: '';
-            position: absolute;
-            top: -15px; left: 50%; transform: translateX(-50%);
-            border-width: 0 15px 15px; border-style: solid;
-            border-color: transparent transparent rgba(255,255,255,0.60); 
-        }
-
-        /* Contenedor Simulador Activo en la parte derecha / enmedio y compacto */
-        #contenedor-simulador {
-            position: absolute;
-            top: 50%;
-            right: 40px;
-            transform: translateY(-50%);
-            width: 360px;
-            height: 400px;
-            background: rgba(15, 23, 42, 0.95);
-            border: 3px solid #38bdf8;
-            border-radius: 20px;
-            display: flex; 
-            flex-direction: column;
-            z-index: 5;
-            padding: 20px;
-            color: white;
-            font-family: 'Courier New', monospace;
-            box-sizing: border-box;
-            box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
-        }
-
-        #pnl-tecnico { 
-            font-size: 14px; 
-            color: #38bdf8; 
-            margin-bottom: 15px; 
-            text-align: center; 
-            font-weight: bold;
-            background: rgba(0,0,0,0.5);
-            padding: 10px;
-            border-radius: 10px;
-            min-height: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid rgba(56, 189, 248, 0.2);
-        }
-
-        #escenario-maestro { 
-            width: 100%;
-            height: 100%;
-            position: relative;
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 8px;
-            padding: 10px;
-            box-sizing: border-box;
-            overflow-y: auto;
-        }
-
-        #consola-red {
-            font-size: 12px;
-            color: #a78bfa;
-            line-height: 1.5;
-            white-space: pre-line;
-        }
-
-        .btn-nav { position: absolute; left: 40px; padding: 12px 25px; font-size: 16px; border: none; border-radius: 10px; cursor: pointer; color: white; z-index: 10; transition: all 0.3s ease; font-weight: bold; }
-        #btn-siguiente { bottom: 500px; background: #007BFF; }
-        #btn-anterior { bottom: 560px; background: #6c757d; }
-        .oculto { display: none; }
-    </style>
+  .chip-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; margin-bottom: 10px; }
+  .chip-box { border: 2px solid #007BFF; border-radius: 8px; background: rgba(0, 123, 255, 0.1); padding: 10px; display: flex; flex-direction: column; align-items: center; text-align: center; position: relative; }
+  .core-mini-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px; width: 80%; margin-top: 5px; }
+  .core-dot { width: 100%; height: 6px; background: #333; border-radius: 2px; }
+  .core-dot.active { animation: activeCore 1s infinite alternate; }
+  
+  .ram-box { border: 2px dashed #28a745; border-radius: 8px; background: rgba(40, 167, 69, 0.1); padding: 10px; color: #28a745; font-weight: bold; font-size: 14px; text-align: center; width: 80%; }
+  
+  .bus-data { height: 16px; border-top: 2px solid #ffc107; border-bottom: 2px solid #ffc107; background: #222; width: 100%; position: relative; margin: 15px 0; display: flex; align-items: center; border-radius: 4px; }
+  .packet { position: absolute; width: 10px; height: 10px; background: #fff; border-radius: 50%; }
+  
+  /* Barra de progreso global para la tarea */
+  .task-progress { width: 100%; height: 25px; background: #222; border: 2px solid #444; border-radius: 12px; margin-top: 20px; overflow: hidden; position: relative; }
+  .task-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #007BFF, #00ff66); transition: width 0.3s; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: bold; color: black; }
+  .speed-indicator { font-size: 12px; color: #ffc107; margin-top: 5px; font-family: monospace; text-align: right; width: 100%; }
+</style>
 </head>
-<body onload="inicializarEscena()">
+<body>
+<div id="escena">
+  <img id="fondo" src="" alt="Fondo">
+  
+  <div id="contenedor-simulador">
+    <div id="pnl-tecnico">MONITOR DE RENDIMIENTO</div>
+    <div id="escenario-maestro">
+      </div>
+  </div>
+  
+  <div id="contenedor-personaje">
+    <div id="mensaje"></div>
+    <img id="personaje" src="" alt="Locutor">
+  </div>
+</div>
 
-    <div id="escena">
-        <img id="fondo" src="imagenes/Laboratorio_Entrada.jpg">
-        
-        <div id="contenedor-capturas">
-            <img id="img-captura" src="" alt="Paso Windows">
-            <button id="btn-cambiar-img">Siguiente Imagen ➔</button>
+<button id="btn-siguiente" class="btn-nav">Siguiente</button>
+<button id="btn-anterior" class="btn-nav oculto">Anterior</button>
+
+<script>
+  // Rutas originales respetadas y el mensaje modificado justo en la escena de Coherencia
+  const escenas = [
+    {
+      fondo: "Dinosaurio/imagenes/Laboratorio_MonitorApagado.jpg", 
+      pers: "Dinosaurio/imagenes/Mapache_Saluda.png",
+      titulo: "RETO: LEER MIL MILLONES DE LIBROS", modoSimulador: "intro",
+      msg: "\"¡Hola Mapaches! Bienvenidos. ¿Recuerdan la práctica del chip Octa-Core?<br><br>Hoy tenemos una tarea súper sencilla pero inmensa: <b>Buscar una contraseña secreta escondida entre mil millones de libros.</b> Vamos a ver qué pasa cuando 1 solo chip ya no basta y usamos el poder de 8 chips Octa-Core juntos.\""
+    },
+    {
+      fondo: "Dinosaurio/imagenes/2B.png", 
+      pers: "Dinosaurio/imagenes/Mapache_Explica_ConDedo.png",
+      titulo: "1 OCTA-CORE (Lentitud Máxima)", modoSimulador: "un-chip",
+      msg: "\"Observen el simulador. Pusimos a nuestro único chip Octa-Core a revisar la biblioteca. Sus 8 núcleos leen muy rápido, pero son demasiados libros para él solo.<br><br>La barra avanza lentísimo... ¡Tardaría una eternidad! Necesitamos escalar y meterle más chips a nuestra placa madre.\""
+    },
+    {
+      fondo: "Dinosaurio/imagenes/3B.png", 
+      pers: "Dinosaurio/imagenes/Mapache_ManosAbiertas.png",
+      titulo: "ARQUITECTURA SMP (Embotellamiento)", modoSimulador: "smp",
+      msg: "\"¡A escalar! Colocamos 8 chips Octa-Core (¡64 núcleos!) en la misma tarjeta madre. A esto se le llama SMP.<br><br>Pero todos comparten un único pasillo (Bus) para llegar a la única biblioteca (RAM). ¡Miren el embotellamiento en rojo! Revisan más libros, pero se estorban al pedirlos.\""
+    },
+    {
+      fondo: "Dinosaurio/imagenes/1B.png", 
+      pers: "Dinosaurio/imagenes/Mapache_Explica_ConDedo.png",
+      titulo: "ARQUITECTURA NUMA (Cero Tráfico)", modoSimulador: "numa",
+      msg: "\"Para solucionar el atasco, usamos el diseño <b>NUMA (Acceso a Memoria No Uniforme)</b>. ¡Esto significa dividir la biblioteca y darle a cada chip su propio estante de libros privado!<br><br>Ya no hay tráfico. Cada procesador revisa su estante personal a velocidad luz y la barra vuela.\""
+    },
+    {
+      fondo: "Dinosaurio/imagenes/5B.png", 
+      pers: "Dinosaurio/imagenes/Mapache_ManosAbiertas.png",
+      titulo: "COHERENCIA DE CACHÉ (Protocolo MESI)", modoSimulador: "coherencia",
+      msg: "\"Pero, ¿cómo evitan leer el mismo libro dos veces por accidente? ¡Con el <b>Protocolo MESI</b>!<br><br>Funciona como un grupo de WhatsApp. Por ejemplo, en el simulador puedes ver cómo se envían mensajes diciendo: el Chip 1 avisa <i>'¡Ya leí el libro A!'</i> y el Chip 2 le contesta <i>'¡Anotado, yo no lo toco!'</i>.<br><br>¡Así mantienen todo ordenado y nadie hace el trabajo doble!\""
+    },
+    {
+      fondo: "Dinosaurio/imagenes/4B.png", 
+      pers: "Dinosaurio/imagenes/Mapache_Saluda.png",
+      titulo: "¡TAREA GIGANTE COMPLETADA!", modoSimulador: "fin",
+      msg: "\"¡Lo logramos! Pasamos de ver a un solo Octa-Core ahogarse en libros, a presenciar el poder de 64 núcleos organizados a la perfección.<br><br>¡Ahora dominan qué es NUMA y para qué sirve el MESI, Mapaches! Nos vemos en la próxima clase.\""
+    }
+  ];
+
+  let indice = 0;
+  let barInterval;
+
+  // Función auxiliar para dibujar un chip OctaCore
+  function generarChipHTML(id) {
+    return `
+      <div class="chip-box">
+        <span style="font-size:11px; font-weight:bold; color:#007BFF;">CHIP ${id}</span>
+        <div class="core-mini-grid">
+          <div class="core-dot active" style="animation-delay:0.1s"></div>
+          <div class="core-dot active" style="animation-delay:0.2s"></div>
+          <div class="core-dot active" style="animation-delay:0.3s"></div>
+          <div class="core-dot active" style="animation-delay:0.4s"></div>
+          <div class="core-dot active" style="animation-delay:0.5s"></div>
+          <div class="core-dot active" style="animation-delay:0.6s"></div>
+          <div class="core-dot active" style="animation-delay:0.7s"></div>
+          <div class="core-dot active" style="animation-delay:0.8s"></div>
         </div>
+      </div>
+    `;
+  }
 
-        <div id="contenedor-simulador">
-            <div id="pnl-tecnico">Iniciando sistema de redes...</div>
-            <div id="escenario-maestro">
-                <div id="consola-red"></div>
+  function renderizarSimulador(modo) {
+    const escenario = document.getElementById("escenario-maestro");
+    clearInterval(barInterval);
+    let html = "";
+
+    if (modo === "intro" || modo === "fin") {
+      html = `
+        <div style="text-align:center; color:#00ff66;">
+          <h1 style="font-size:50px; margin:0; text-shadow: 0 0 20px #00ff66;">${modo === 'intro' ? '📚' : '✅'}</h1>
+          <h2 style="margin-bottom: 5px;">${modo === 'intro' ? 'TAREA: BUSCAR EN LA BIBLIOTECA' : '¡CONTRASEÑA ENCONTRADA!'}</h2>
+          <p style="color:#ddd; font-size:15px; margin-top:0;">1,000,000,000 de libros por revisar</p>
+        </div>`;
+      escenario.innerHTML = html;
+    }
+    else if (modo === "un-chip") {
+      html = `
+        <div style="display:flex; flex-direction:column; align-items:center; width:100%; gap:20px; flex:1; justify-content:center;">
+           <div style="width:150px; transform: scale(1.5);">
+             ${generarChipHTML(1)}
+           </div>
+           <div class="bus-data" style="width: 60%;">
+              <div class="packet" style="background:#00ff66; animation: packetMove 2s infinite linear;"></div>
+           </div>
+           <div class="ram-box">MEMORIA (Miles de Libros)</div>
+        </div>
+        <div class="speed-indicator">VELOCIDAD: x1 (Demasiados libros)</div>
+        <div class="task-progress"><div class="task-bar" id="bar-single">0%</div></div>
+      `;
+      escenario.innerHTML = html;
+      animarBarra("bar-single", 0.5); 
+    }
+    else if (modo === "smp") {
+      let chipsHTML = "";
+      for(let i=1; i<=8; i++) chipsHTML += generarChipHTML(i);
+      
+      html = `
+        <div class="chip-grid">${chipsHTML}</div>
+        
+        <div class="bus-data" style="animation: flashRed 0.8s infinite;">
+           <div style="position:absolute; top:-18px; width:100%; text-align:center; color:#dc3545; font-size:12px; font-weight:bold; letter-spacing: 2px;">⚠️ BUS SATURADO (SMP) ⚠️</div>
+           <div class="packet" style="background:#dc3545; animation: packetMove 2.5s infinite linear;"></div>
+           <div class="packet" style="background:#dc3545; animation: packetMove 2.5s infinite linear 0.3s;"></div>
+           <div class="packet" style="background:#dc3545; animation: packetMove 2.5s infinite linear 0.6s;"></div>
+           <div class="packet" style="background:#dc3545; animation: packetMove 2.5s infinite linear 0.9s;"></div>
+        </div>
+        
+        <div class="ram-box" style="width:100%; border-color:#dc3545; color:#dc3545;">1 SOLA BIBLIOTECA PARA TODOS</div>
+        
+        <div class="speed-indicator" style="color:#dc3545;">VELOCIDAD: x3 (Se estorban en el pasillo)</div>
+        <div class="task-progress"><div class="task-bar" id="bar-smp">0%</div></div>
+      `;
+      escenario.innerHTML = html;
+      animarBarra("bar-smp", 2.5); 
+    }
+    else if (modo === "numa") {
+      html = `
+        <div style="display:flex; justify-content:space-between; width:100%; height:100%;">
+          <div style="width: 45%; display:flex; flex-direction:column; gap:5px;">
+            <div style="display:flex; gap:10px;">${generarChipHTML(1)} ${generarChipHTML(2)}</div>
+            <div style="display:flex; gap:10px;">${generarChipHTML(3)} ${generarChipHTML(4)}</div>
+            <div class="ram-box" style="width:100%; margin-top:10px;">ESTANTE PRIVADO 1</div>
+          </div>
+          
+          <div style="width:10%; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+             <span style="font-size:10px; color:#ffc107; writing-mode: vertical-rl; transform: rotate(180deg);">PUENTE NUMA</span>
+          </div>
+
+          <div style="width: 45%; display:flex; flex-direction:column; gap:5px;">
+            <div style="display:flex; gap:10px;">${generarChipHTML(5)} ${generarChipHTML(6)}</div>
+            <div style="display:flex; gap:10px;">${generarChipHTML(7)} ${generarChipHTML(8)}</div>
+            <div class="ram-box" style="width:100%; margin-top:10px;">ESTANTE PRIVADO 2</div>
+          </div>
+        </div>
+        
+        <div class="speed-indicator" style="color:#00ff66;">VELOCIDAD: x8 (Leyendo sin tráfico)</div>
+        <div class="task-progress"><div class="task-bar" id="bar-numa">0%</div></div>
+      `;
+      escenario.innerHTML = html;
+      animarBarra("bar-numa", 10); 
+    }
+    else if (modo === "coherencia") {
+      html = `
+        <div style="text-align:center; color:#007BFF; font-weight:bold; margin-bottom: 15px; font-size:14px;">GRUPO DE WHATSAPP MESI EN ACCIÓN</div>
+        <div style="display:flex; justify-content:space-around; align-items:center; flex:1; width:100%;">
+          
+          <div class="chip-box" style="width: 30%; animation: pulseBlue 1.5s infinite;">
+             <span style="color:white; font-weight:bold;">CHIP 1</span>
+             <span style="font-size:10px; color:#00ff66; margin-top:10px;">"¡Ya leí el libro A!"</span>
+          </div>
+
+          <div style="width:40%; display:flex; flex-direction:column; align-items:center;">
+            <span style="font-size:11px; color:#007BFF; font-weight:bold;">Avisando al equipo...</span>
+            <div class="bus-data" style="border-color:#007BFF; margin:5px 0;">
+              <div class="packet" style="background:#007BFF; animation: packetMove 1s infinite alternate;"></div>
+              <div class="packet" style="background:#007BFF; animation: packetMove 1s infinite alternate-reverse;"></div>
             </div>
+          </div>
+
+          <div class="chip-box" style="width: 30%; animation: pulseBlue 1.5s infinite 0.5s;">
+             <span style="color:white; font-weight:bold;">CHIP 2</span>
+             <span style="font-size:10px; color:#00ff66; margin-top:10px;">"¡Anotado, yo no lo toco!"</span>
+          </div>
         </div>
-
-        <div id="contenedor-personaje">
-            <div id="mensaje"></div>
-            <img id="personaje" src="">
-        </div>
-    </div>
-
-    <button id="btn-siguiente" class="btn-nav">Siguiente</button>
-    <button id="btn-anterior" class="btn-nav oculto">Anterior</button>
-
-    <script>
-        const escenas = [
-            { 
-                fondo: "imagenes/Laboratorio_Entrada.jpg", 
-                pers: "imagenes/Mapache_Saluda.png", 
-                msg: `!Hola Mapaches¡ Antes de conectar las tres computadoras \n\n👉Primero hay verificar que la tarjeta de red funciona en Windows:\n\nPrimero presiona Windows + S en tu teclado.\n\nEscribe Administrador de dispositivos.\n\nÁbrelo y busca la sección Adaptadores de red.\n\nSi aparece tu tarjeta sin ícono amarillo, el driver está bien. Si aparece con advertencia, falta instalar el driver.`,
-                log: "STATUS: Verificando Hardware...\n> devmgmt.msc\n> Buscando Adaptadores de Red...\n[OK] Driver de red operativo.",
-                titulo: "PASO 0: DIAGNÓSTICO",
-                imagenes: []
-            },
-            { 
-                fondo: "imagenes/Laboratorio_Puerta.jpg", 
-                pers: "imagenes/Mapache_Izquierda.png", 
-                msg: `⚙️ Ahora si estos son los pasos completos para conectar las tres computadoras en Windows\nPero antes, entremos al aula.`,
-                log: "STATUS: Inicializando Guía de Red\n> Carga de topología LAN...\n> Nodos requeridos: 3 PCs.\n> Estado: Esperando implementación.",
-                titulo: "CONFIGURACIÓN LAN",
-                imagenes: []
-            },
-            { 
-                fondo: "imagenes/Laboratorio_Animado.jpg", 
-                pers: "imagenes/Mapache_ManosAbiertas.png", 
-                msg: `🔧 Paso 1: Conexión física\nColoca el switch en un lugar central.\n\nConecta cada computadora al switch con un cable Ethernet.\n\nVerifica que las luces del switch y de las tarjetas de red estén encendidas (indican que hay conexión física).`,
-                log: "STATUS: Capa Física (Capa 1)\n> Enlazando PC1 -> Switch (Puerto 1)\n> Enlazando PC2 -> Switch (Puerto 2)\n> Enlazando PC3 -> Switch (Puerto 3)\n[LINK] Luces de enlace activas.",
-                titulo: "PASO 1: CONEXIÓN FÍSICA",
-                imagenes: []
-            },
-            { 
-                fondo: "imagenes/Laboratorio_Animado.jpg", 
-                pers: "imagenes/Mapache_Explica_ConDedo.png", 
-                msg: `🖥️ Paso 2: Configuración de IP en cada computadora\nHaz lo mismo en las tres PC, cambiando solo la dirección IP:\n\nPresiona Windows + S y escribe: Panel de control.\n\nÁbrelo.\n\nVe a Centro de redes y recursos compartidos.\n\nEn la barra lateral izquierda, selecciona Cambiar configuración del adaptador.\n\nHaz clic derecho sobre Ethernet → selecciona Propiedades.\n\nEn la lista, selecciona Protocolo de Internet versión 4 (TCP/IPv4) → clic en Propiedades.\n\nMarca la opción Usar la siguiente dirección IP.\n\nAsigna:\n\nPC1 → IP: 192.168.1.2 | Máscara: 255.255.255.0 | Puerta de enlace: 192.168.1.1 (si hay router).\n\nPC2 → IP: 192.168.1.3 | Máscara: 255.255.255.0 | Puerta de enlace: 192.168.1.1.\n\nPC3 → IP: 192.168.1.4 | Máscara: 255.255.255.0 | Puerta de enlace: 192.168.1.1.\n\nHaz clic en Aceptar → Cerrar.`,
-                log: "STATUS: Capa de Red (TCP/IPv4)\n> PC1: 192.168.1.2\n> PC2: 192.168.1.3\n> PC3: 192.168.1.4\n> Netmask: 255.255.255.0\n[OK] Direccionamiento asignado.",
-                titulo: "PASO 2: ASIGNACIÓN IP",
-                imagenes: ["imagenes/1a.png", "imagenes/2a.png", "imagenes/3a.png", "imagenes/4a.png", "imagenes/5a.png"]
-            },
-            { 
-                fondo: "imagenes/Laboratorio_Animado.jpg", 
-                pers: "imagenes/Mapache_Explica_ConDedo.png", 
-                msg: `📡 Paso 3: Verificación de conexión\nEn cada PC, abre el buscador di Windows y escribe: cmd.\n\nAbre la aplicación Símbolo del sistema.\n\nDesde PC1 escribe: ping 192.168.1.3 y luego ping 192.168.1.4.\n\nDesde PC2 escribe: ping 192.168.1.2 y ping 192.168.1.4.\n\nDesde PC3 escribe: ping 192.168.1.2 y ping 192.168.1.3.\n\nSi recibes respuestas con tiempo en milisegundos, la red está activa.`,
-                log: "STATUS: Prueba ICMP (Ping)\n> PC1 a PC2/PC3... [ÉXITO]\n> PC2 a PC1/PC3... [ÉXITO]\n> PC3 a PC1/PC2... [ÉXITO]\n[STATUS] Paquetes: Enviados=4, Recibidos=4.",
-                titulo: "PASO 3: PRUEBA PING",
-                imagenes: ["imagenes/6a.png"]
-            },
-            { 
-                fondo: "imagenes/Laboratorio_Animado.jpg", 
-                pers: "imagenes/Mapache_ManosAbiertas.png", 
-                msg: `📂 Paso 4: Activar uso compartido de archivos\nEn cada PC abre el buscador y escribe: Centro de redes y recursos compartidos.\n\nEn la barra lateral, selecciona Cambiar configuración de uso compartido avanzado.\n\nActiva:\n\n“Detección de redes”.\n\n“Compartir archivos e impresoras”.\n\nCrea una carpeta en cada PC → clic derecho → Propiedades → pestaña Compartir → “Compartir con usuarios específicos”.\n\nAsigna permisos (solo lectura o lectura/escritura).`,
-                log: "STATUS: Servicios de Red\n> Habilitando Network Discovery...\n> Iniciando Server Service (LanmanServer)\n> Permisos: Lectura/Escritura otorgados.",
-                titulo: "PASO 4: COMPARTIR RECURSOS",
-                imagenes: ["imagenes/7a.png", "imagenes/8a.png", "imagenes/9a.png"]
-            },
-            { 
-                fondo: "imagenes/Laboratorio_Animado.jpg", 
-                pers: "imagenes/Mapache_ManosAbiertas.png", 
-                msg: `📁 Paso 5: Acceso a recursos compartidos\nAbre el Explorador de archivos en Windows.\n\nEn la barra lateral, selecciona Red.\n\nVerifica que aparezcan las otras dos computadoras.\n\nHaz doble clic en la carpeta compartida para acceder.\n\nCopia un archivo de PC1 a PC2 y ábrelo en PC2.\n\nHaz lo mismo entre PC2 y PC3.`,
-                log: "STATUS: Transferencia de Datos\n> Abriendo explorer.exe -> Red\n> Enlazando con remoto \\\\192.168.1.3\n> Copiando archivo exitosamente.\n[FIN DE CONFIGURACIÓN LAN]",
-                titulo: "PASO 5: ACCESO REMOTO",
-                imagenes: ["imagenes/10a.png"]
-            },
-            { 
-                fondo: "imagenes/Laboratorio_Animado.jpg", 
-                pers: "imagenes/Mapache_ManosAbiertas.png", 
-                msg: `Y Ahora que las tres computadoras están conectadas y comparten recursos, también pueden colaborar en tareas más complejas.`,
-                log: "STATUS: Modos Avanzados\n> Red LAN lista.\n> Detectando múltiples núcleos distribuidos.\n> Preparando clúster...",
-                titulo: "COLABORACIÓN DE RED",
-                imagenes: []
-            },
-            { 
-                fondo: "imagenes/Laboratorio_Animado.jpg", 
-                pers: "imagenes/Mapache_ManosAbiertas.png", 
-                msg: `Esto se conoce como procesamiento paralelo, donde una tarea grande se divide en partes y cada computadora procesa una sección al mismo tiempo.`,
-                log: "STATUS: Cómputo Paralelo\n> Dividiendo Tarea Principal...\n> [Nodo 1 - PC1]: Procesando Parte A\n> [Nodo 2 - PC2]: Procesando Parte B\n> [Nodo 3 - PC3]: Procesando Parte C",
-                titulo: "PROCESAMIENTO PARALELO",
-                imagenes: []
-            },
-            { 
-                fondo: "imagenes/Laboratorio_Animado.jpg", 
-                pers: "imagenes/Mapache_ManosAbiertas.png", 
-                msg: `Al final, los resultados se combinan, logrando mayor velocidad y eficiencia que si un solo equipo trabajara en todo el problema.`,
-                log: "STATUS: Sincronización\n> Recibiendo sub-resultados...\n> Combinando matrices de datos...\n[ÉXITO] Tarea completada a triple velocidad.",
-                titulo: "SIMULACIÓN COMPLETADA",
-                imagenes: []
-            }
-        ];
-
-        let indice = 0;
-        let subIndiceImg = 0; 
         
-        const pnlTecnico = document.getElementById("pnl-tecnico");
-        const consolaRed = document.getElementById("consola-red");
-        const contenedorCapturas = document.getElementById("contenedor-capturas");
-        const imgCaptura = document.getElementById("img-captura");
-        const btnCambiarImg = document.getElementById("btn-cambiar-img");
+        <div class="speed-indicator" style="color:#007BFF;">TRABAJO EN EQUIPO SIN REPETIR</div>
+        <div class="task-progress"><div class="task-bar" id="bar-mesi">0%</div></div>
+      `;
+      escenario.innerHTML = html;
+      animarBarra("bar-mesi", 15); 
+    }
+  }
 
-        function actualizarSimulador(num) {
-            const escena = escenas[num];
-            pnlTecnico.innerText = escena.titulo;
-            consolaRed.innerText = escena.log;
+  function animarBarra(idBarra, velocidad) {
+    let progreso = 0;
+    const barra = document.getElementById(idBarra);
+    barInterval = setInterval(() => {
+      progreso += velocidad;
+      if (progreso > 100) progreso = 100;
+      barra.style.width = progreso + "%";
+      barra.innerText = Math.floor(progreso) + "%";
+      if (progreso >= 100) clearInterval(barInterval);
+    }, 100);
+  }
 
-            subIndiceImg = 0; 
-            if (escena.imagenes && escena.imagenes.length > 0) {
-                contenedorCapturas.style.display = "flex";
-                imgCaptura.src = escena.imagenes[subIndiceImg];
-                
-                // --- AJUSTE DE POSICIÓN HORIZONTAL (LEFT) ---
-                if (num === 3) {
-                    contenedorCapturas.style.left = "550px"; // Escena 4: Un poco más a la derecha (antes 500px)
-                } else if (num === 4) {
-                    contenedorCapturas.style.left = "640px"; 
-                } else {
-                    contenedorCapturas.style.left = "540px"; // Por defecto para el resto
-                }
+  function inicializarEscena() {
+    document.getElementById("btn-siguiente").addEventListener("click", () => {
+      if (indice < escenas.length - 1) cambiarEscena(indice + 1);
+    });
+    document.getElementById("btn-anterior").addEventListener("click", () => {
+      if (indice > 0) cambiarEscena(indice - 1);
+    });
+    cambiarEscena(0);
+  }
 
-                // --- AJUSTE DE TAMAÑO Y POSICIÓN VERTICAL (TOP) ---
-                if (num === 3) {
-                    // Escena 4: Un poco más hacia arriba que antes (top: -15px)
-                    contenedorCapturas.style.top = "-15px";      
-                    contenedorCapturas.style.width = "530px";   
-                    contenedorCapturas.style.height = "560px";  
-                } else if (num === 5) {
-                    // Escena 6: Subida un poco más hacia arriba también (top: -15px)
-                    contenedorCapturas.style.top = "-15px";      
-                    contenedorCapturas.style.width = "530px";   
-                    contenedorCapturas.style.height = "560px";  
-                } else {
-                    // Valores base por defecto
-                    contenedorCapturas.style.top = "80px";
-                    contenedorCapturas.style.width = "390px";
-                    contenedorCapturas.style.height = "440px";
-                }
+  function cambiarEscena(nuevoIndice) {
+    indice = nuevoIndice;
+    const escena = escenas[indice];
+    const fondo = document.getElementById("fondo");
+    const personaje = document.getElementById("personaje");
+    const mensaje = document.getElementById("mensaje");
+    const contenedorSimulador = document.getElementById("contenedor-simulador");
 
-                if (escena.imagenes.length > 1) {
-                    btnCambiarImg.style.display = "inline-block";
-                } else {
-                    btnCambiarImg.style.display = "none";
-                }
-            } else {
-                contenedorCapturas.style.display = "none";
-            }
-        }
+    fondo.style.opacity = 0;
+    setTimeout(() => {
+      fondo.src = escena.fondo;
+      personaje.src = escena.pers;
+      
+      let tituloHTML = escena.titulo ? `<h2>${escena.titulo}</h2>` : "";
+      mensaje.innerHTML = tituloHTML + escena.msg;
+      
+      contenedorSimulador.classList.remove("oculto");
+      renderizarSimulador(escena.modoSimulador);
+      
+      document.getElementById("btn-anterior").classList.toggle("oculto", indice === 0);
+      document.getElementById("btn-siguiente").innerText = (indice === escenas.length - 1) ? "Finalizar" : "Siguiente";
+      
+      fondo.style.opacity = 1;
+    }, 200);
+  }
 
-        function cambiarEscena(nuevoIndice) {
-            indice = nuevoIndice;
-            const escena = escenas[indice];
-            const fondo = document.getElementById("fondo");
-            const personaje = document.getElementById("personaje");
-            const mensaje = document.getElementById("mensaje");
-
-            fondo.style.opacity = 0;
-            setTimeout(() => {
-                fondo.src = escena.fondo;
-                personaje.src = escena.pers;
-                
-                mensaje.innerHTML = escena.msg.replace(/\n/g, "<br>");
-                personaje.style.height = "390px"; 
-                
-                actualizarSimulador(indice);
-                
-                document.getElementById("btn-anterior").classList.toggle("oculto", indice === 0);
-                document.getElementById("btn-siguiente").innerText = (indice === escenas.length - 1) ? "Fin" : "Siguiente";
-                fondo.style.opacity = 1;
-            }, 150);
-        }
-
-        function inicializarEscena() { cambiarEscena(0); }
-
-        btnCambiarImg.addEventListener("click", () => {
-            const listaImgs = escenas[indice].imagenes;
-            if (listaImgs && listaImgs.length > 1) {
-                subIndiceImg = (subIndiceImg + 1) % listaImgs.length;
-                imgCaptura.src = listaImgs[subIndiceImg];
-            }
-        });
-
-        document.getElementById("btn-siguiente").addEventListener("click", () => { 
-            if (indice < escenas.length - 1) {
-                cambiarEscena(indice + 1); 
-            } else {
-                alert("¡Has terminado la lección sobre redes y procesamiento paralelo!");
-            }
-        });
-        
-        document.getElementById("btn-anterior").addEventListener("click", () => { if (indice > 0) cambiarEscena(indice - 1); });
-    </script>
+  window.onload = inicializarEscena;
+</script>
 </body>
 </html>
